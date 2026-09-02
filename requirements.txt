@@ -1,0 +1,82 @@
+# Pratyush Computer Services — shop management
+#
+# Install into a virtualenv:
+#     python -m venv .venv
+#     .venv\Scripts\activate            (Windows)
+#     pip install -r requirements.txt
+#
+# Pinned deliberately. This runs one shop's books on one server; an unattended
+# upgrade that changes Pydantic's validation behaviour is a bigger risk than
+# missing a point release.
+
+fastapi==0.141.1
+starlette==1.6.0
+pydantic==2.12.5
+jinja2==3.1.6
+uvicorn==0.52.4
+python-multipart==0.0.32
+
+
+# -- encryption at rest: REQUIRED on the shop server --------------------------
+#
+# Without this the database file is plain SQLite, readable by anyone who copies
+# it off the machine or out of a backup. The app refuses to start without it
+# unless ALLOW_UNENCRYPTED_DB=1 is set, which is for a developer's laptop only.
+#
+# Read this before changing the line below.
+#
+# The obvious package to reach for is "sqlcipher3-binary", and it is the WRONG
+# one for this shop. It publishes manylinux x86_64 wheels only — no Windows
+# wheel has ever been released, in any version. On a Windows Server the install
+# fails outright, or falls back to compiling from source and needs MSVC, the
+# SQLCipher amalgamation and OpenSSL headers. Do not use it here.
+#
+# "sqlcipher3-wheels" is the same upstream code (coleifer's sqlcipher3) with CI
+# built binary wheels, including win_amd64 for CPython 3.10 through 3.14. It
+# installs as the module "sqlcipher3", which is exactly what app/db.py probes
+# for, so nothing in the code changes.
+#
+sqlcipher3-wheels==0.5.7
+#
+# Verified against the package index on 2026-08-29: 0.5.7 ships
+# sqlcipher3_wheels-0.5.7-cp312-cp312-win_amd64.whl (and cp310/311/313/314,
+# plus win32 and win_arm64). This one IS pinned, because it is the dependency
+# the encryption depends on and a surprise upgrade is not welcome.
+#
+# No longer just an index check — 0.5.7 has since been installed and the app run
+# against it. It loads as module "sqlcipher3", reports SQLCipher 4.12.0 community,
+# and the database it produces is genuinely unreadable: random file header, the
+# stdlib sqlite3 driver refuses it as "file is not a database", and a byte-grep of
+# the file for product names, GSTINs and invoice numbers finds nothing. Purchases,
+# invoices, serials and both GST registers were written and read back through it.
+#
+# After installing, confirm the driver was actually found:
+#     python manage.py status
+# It must say "Encrypted at rest via SQLCipher". If it says the driver is not
+# installed, the app will refuse to start rather than write your books to disk
+# in the clear — fix the install, do not set ALLOW_UNENCRYPTED_DB.
+
+
+# -- password hashing ---------------------------------------------------------
+#
+# Optional. app/security.py prefers argon2id, then bcrypt, and falls back to
+# hashlib.scrypt from the standard library, which is itself a sound choice —
+# so the app is secure with none of these installed. Install argon2 if you
+# want the current best practice. Deliberately NOT pinned, unlike everything
+# above: it is optional, the app degrades to a safe fallback if it is missing,
+# and a hash written by one version verifies fine under a later one. Confirmed
+# working — with this installed, "manage.py status" reports argon2id as the
+# live hashing backend rather than the scrypt fallback.
+argon2-cffi
+# bcrypt
+
+
+# -- not used, on purpose -----------------------------------------------------
+#
+# No reportlab / weasyprint: invoices are HTML with an A4 print stylesheet, and
+#   the browser's "Print → Save as PDF" produces the PDF. One less native
+#   dependency to install on a Windows Server, and the invoice stays editable.
+# No openpyxl / pandas: app/tabular.py reads .xlsx with zipfile and
+#   xml.etree from the standard library. The import only needs cell text.
+# No SQLAlchemy: the schema is fixed and the queries are hand-written SQL,
+#   because the GST registers need exact control over the arithmetic.
