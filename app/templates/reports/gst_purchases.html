@@ -1,0 +1,182 @@
+{% extends "base.html" %}
+{% block title %}GST purchase register · {{ trade }}{% endblock %}
+{% block content %}
+
+{% set qs = '?from=' ~ date_from ~ '&to=' ~ date_to %}
+
+<div class="pagehead">
+  <div>
+    <h1>GST purchase register</h1>
+    <p class="sub">Input tax credit reference · {{ date_from|date }} to {{ date_to|date }} ·
+      {{ totals.count }} bill{{ '' if totals.count == 1 else 's' }}
+      {%- if totals.cancelled %} · {{ totals.cancelled }} cancelled and excluded{% endif %}</p>
+  </div>
+  <div class="pageactions">
+    <a class="btn" href="/reports/gst/purchases{{ qs }}&format=csv">Export CSV</a>
+    <button class="btn" type="button" data-print>Print</button>
+  </div>
+</div>
+
+<form class="filters noprint" method="get" action="/reports/gst/purchases">
+  <label>From <input type="date" name="from" value="{{ date_from }}"></label>
+  <label>To <input type="date" name="to" value="{{ date_to }}"></label>
+  <button class="btn btn-primary" type="submit">Apply</button>
+  <a class="btn btn-quiet" href="/reports/gst/purchases">This month</a>
+</form>
+
+<div class="flash warn noprint">
+  <strong>This app does not file returns, and it does not decide your credit.</strong>
+  These are the GST amounts your dealers printed on their bills, entered as they appear. Credit is
+  only actually available when the dealer has filed and the bill shows up in your GSTR-2B on the
+  portal — check there before you claim.
+</div>
+
+<div class="tiles tiles-4">
+  <div class="tile">
+    <span class="tile-label">Taxable value</span>
+    <span class="tile-value">{{ totals.taxable|money(symbol=True) }}</span>
+    <span class="tile-foot">Cost of purchases before GST</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">CGST + SGST paid</span>
+    <span class="tile-value">{{ (totals.cgst + totals.sgst)|money(symbol=True) }}</span>
+    <span class="tile-foot">Dealers in {{ shop.state_code|state }}</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">IGST paid</span>
+    <span class="tile-value">{{ totals.igst|money(symbol=True) }}</span>
+    <span class="tile-foot">Dealers outside the state</span>
+  </div>
+  <div class="tile {{ 'tile-warn' if unclaimable.count else '' }}">
+    <span class="tile-label">Cannot be claimed</span>
+    <span class="tile-value">{{ unclaimable.tax|money(symbol=True) }}</span>
+    <span class="tile-foot">
+      {%- if unclaimable.count %}{{ unclaimable.count }} bill{{ '' if unclaimable.count == 1 else 's' }} with no dealer GSTIN
+      {%- else %}Every bill has a dealer GSTIN{% endif %}
+    </span>
+  </div>
+</div>
+
+{% if unclaimable.count %}
+<div class="flash err">
+  <strong>{{ unclaimable.count }} bill{{ '' if unclaimable.count == 1 else 's' }} come from a dealer
+  with no GSTIN on file.</strong>
+  A bill from a dealer you cannot identify by GSTIN cannot support an input tax credit claim, so the
+  {{ unclaimable.tax|money(symbol=True) }} of GST on {{ 'it' if unclaimable.count == 1 else 'them' }}
+  is a plain cost to you. If the dealer is in fact registered, put their GSTIN on their
+  <a href="/dealers">dealer record</a> and it will apply to their bills here.
+</div>
+{% endif %}
+
+<section class="card">
+  <h2>By dealer</h2>
+  <div class="tablewrap">
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Dealer</th><th>GSTIN</th><th class="num">Bills</th><th class="num">Taxable</th>
+        <th class="num">CGST</th><th class="num">SGST</th><th class="num">IGST</th><th class="num">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in by_dealer %}
+      <tr class="{{ 'row-warn' if not d.gstin else '' }}">
+        <td>{{ d.name }}</td>
+        <td class="mono">{{ d.gstin or '—' }}
+          {% if not d.gstin %}<span class="pill pill-warn">no ITC</span>{% endif %}
+        </td>
+        <td class="num">{{ d.bills }}</td>
+        <td class="num">{{ d.taxable|money }}</td>
+        <td class="num">{{ d.cgst|money }}</td>
+        <td class="num">{{ d.sgst|money }}</td>
+        <td class="num">{{ d.igst|money }}</td>
+        <td class="num"><strong>{{ d.total|money }}</strong></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="empty">No purchases in this range.</td></tr>
+      {% endfor %}
+    </tbody>
+    {% if by_dealer %}
+    <tfoot>
+      <tr>
+        <th colspan="3">{{ by_dealer|length }} dealer{{ '' if by_dealer|length == 1 else 's' }}</th>
+        <th class="num">{{ totals.taxable|money }}</th>
+        <th class="num">{{ totals.cgst|money }}</th>
+        <th class="num">{{ totals.sgst|money }}</th>
+        <th class="num">{{ totals.igst|money }}</th>
+        <th class="num">{{ totals.total|money }}</th>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+  </div>
+</section>
+
+<div class="card flush">
+  <div class="cardhead" style="padding: var(--gap) var(--gap) 0">
+    <h2>Bill-wise register</h2>
+    <span class="fineprint">Their bill numbers, not ours</span>
+  </div>
+  <div class="tablewrap">
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Bill date</th><th>Bill no</th><th>Dealer</th><th>Dealer GSTIN</th><th>Supply</th>
+        <th class="num">Taxable</th><th class="num">CGST</th><th class="num">SGST</th>
+        <th class="num">IGST</th><th class="num">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in purchases %}
+      <tr class="{{ 'row-void' if p.is_void else ('row-warn' if not p.dealer_gstin else '') }}">
+        <td>{{ p.bill_date|date }}</td>
+        <td><a href="/purchases/{{ p.id }}" class="mono">{{ p.bill_number or '(none)' }}</a>
+          {% if p.is_void %}<span class="pill pill-danger">cancelled</span>{% endif %}
+        </td>
+        <td>{{ p.dealer_name }}</td>
+        <td class="mono">{{ p.dealer_gstin or '—' }}</td>
+        <td>{{ 'Inter-state' if p.interstate else 'Intra-state' }}
+          <small>{{ p.dealer_state|state if p.dealer_state else 'state not set' }}</small>
+        </td>
+        <td class="num">{{ p.taxable_paise|money }}</td>
+        <td class="num">{{ p.cgst_paise|money }}</td>
+        <td class="num">{{ p.sgst_paise|money }}</td>
+        <td class="num">{{ p.igst_paise|money }}</td>
+        <td class="num"><strong>{{ p.total_paise|money }}</strong></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10" class="empty">No bills between these dates.</td></tr>
+      {% endfor %}
+    </tbody>
+    {% if purchases %}
+    <tfoot>
+      <tr>
+        <th colspan="5">{{ totals.count }} live bill{{ '' if totals.count == 1 else 's' }}</th>
+        <th class="num">{{ totals.taxable|money }}</th>
+        <th class="num">{{ totals.cgst|money }}</th>
+        <th class="num">{{ totals.sgst|money }}</th>
+        <th class="num">{{ totals.igst|money }}</th>
+        <th class="num">{{ totals.total|money }}</th>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+  </div>
+</div>
+
+<section class="card">
+  <h2>What to do with these figures</h2>
+  <ul class="prose">
+    <li>The GST here is credit you paid out and can set against the GST you collected on
+      <a href="/reports/gst/sales{{ qs }}">sales</a>. The difference is roughly what you pay the
+      government for the period.</li>
+    <li>CGST and SGST credit can only be set against CGST and SGST. IGST credit is more flexible.
+      Your accountant applies the set-off rules — this screen only lays out the inputs.</li>
+    <li>A bill dated in this period but received later still belongs to the period on the bill.
+      That is why the register goes by bill date, not by when it was keyed in.</li>
+    <li>Reverse charge, imports and capital goods are not modelled here. If any of those apply,
+      tell your accountant separately — this register will not show them.</li>
+  </ul>
+</section>
+
+{% endblock %}

@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} · {{ trade }}{% endblock %}
+{% block content %}
+
+{% set low = product.quantity <= product.low_stock_threshold %}
+
+<div class="pagehead">
+  <div>
+    <h1>{{ product.name }}</h1>
+    <p class="sub">
+      <span class="mono">{{ product.sku }}</span> · {{ product.category }}
+      {% if product.brand %} · {{ product.brand }}{% endif %}
+      {% if not product.is_active %}<span class="pill pill-warn">inactive</span>{% endif %}
+    </p>
+  </div>
+  <div class="pageactions">
+    <a class="btn btn-primary" href="/products/{{ product.id }}/edit">Edit</a>
+    <a class="btn" href="/sales/new">Sell</a>
+    <a class="btn" href="/purchases/new">Buy more</a>
+  </div>
+</div>
+
+<div class="tiles">
+  <div class="tile {{ 'tile-warn' if low else '' }}">
+    <span class="tile-label">On hand</span>
+    <span class="tile-value">{{ product.quantity }} {{ product.unit }}</span>
+    <span class="tile-foot">Alert at {{ product.low_stock_threshold }}</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Cost / Sale</span>
+    <span class="tile-value">{{ product.sale_price_paise|money(symbol=True) }}</span>
+    <span class="tile-foot">Cost {{ product.cost_price_paise|money(symbol=True) }}
+      · margin {{ (product.sale_price_paise - product.cost_price_paise)|money(symbol=True) }}</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">GST</span>
+    <span class="tile-value">{{ product.gst_rate_bp|rate }}</span>
+    <span class="tile-foot">HSN {{ product.hsn_code or 'not set' }}</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Stock value at cost</span>
+    <span class="tile-value">{{ (product.quantity * product.cost_price_paise)|money(symbol=True) }}</span>
+    <span class="tile-foot">
+      {% if product.is_serialized %}Serial tracked{% else %}Not serial tracked{% endif %}
+      {%- if product.warranty_months %} · {{ product.warranty_months }} month warranty{% endif %}
+    </span>
+  </div>
+</div>
+
+{% if product.specs %}
+<div class="card">
+  <h2>Specification</h2>
+  <p style="white-space: pre-wrap; margin: 0;">{{ product.specs }}</p>
+</div>
+{% endif %}
+
+<div class="grid2">
+  <section class="card">
+    <h2>Stock take</h2>
+    <p class="fineprint">Enter what you actually counted. The difference is written to the
+      stock ledger with your note, so the number stays explainable.</p>
+    <form method="post" action="/products/{{ product.id }}/adjust-stock">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="formgrid">
+        <label>Counted quantity
+          <input name="new_quantity" type="number" min="0" step="1" value="{{ product.quantity }}" required>
+        </label>
+        <label>Reason
+          <input name="reason" placeholder="Stock take, damage, correction…">
+        </label>
+      </div>
+      <button class="btn btn-primary" type="submit">Adjust stock</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="cardhead">
+      <h2>Recent purchases</h2>
+      <a href="/reports/dealers?product_id={{ product.id }}">Compare dealers</a>
+    </div>
+    {% if recent_purchases %}
+    <table class="table compact">
+      <thead><tr><th>Dealer</th><th>Bill</th><th class="num">Qty</th><th class="num">Unit cost</th></tr></thead>
+      <tbody>
+        {% for r in recent_purchases %}
+        <tr class="{{ 'row-void' if r.is_void else '' }}">
+          <td>{{ r.dealer_name }}</td>
+          <td><a href="/purchases/{{ r.id }}">{{ r.bill_number or '(no number)' }}</a>
+            <small>{{ r.bill_date|date }}</small></td>
+          <td class="num">{{ r.qty }}</td>
+          <td class="num">{{ r.unit_cost_paise|money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">Never purchased through this app yet.</p>
+    {% endif %}
+  </section>
+</div>
+
+{% if product.is_serialized %}
+<section class="card flush">
+  <div class="cardhead">
+    <h2>Serial numbers ({{ serials|length }})</h2>
+    <a href="/serials?product_id={{ product.id }}">Manage</a>
+  </div>
+  <div class="tablewrap">
+  <table class="table stack">
+    <thead><tr><th>Serial</th><th>Status</th><th>Purchased</th><th>Warranty until</th></tr></thead>
+    <tbody>
+      {% for s in serials %}
+      <tr>
+        <td><a href="/serials/{{ s.id }}" class="mono">{{ s.serial_no }}</a></td>
+        <td>
+          {% if s.status == 'in_stock' %}<span class="pill pill-ok">in stock</span>
+          {% elif s.status == 'sold' %}<span class="pill pill-info">sold</span>
+          {% else %}<span class="pill pill-warn">returned</span>{% endif %}
+        </td>
+        <td>{{ s.purchase_date|date if s.purchase_date else '—' }}</td>
+        <td>{{ s.warranty_expiry|date if s.warranty_expiry else '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="empty">No serials recorded yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="card flush">
+  <div class="cardhead"><h2>Stock ledger</h2></div>
+  <div class="tablewrap">
+  <table class="table stack compact">
+    <thead><tr><th>When</th><th>Change</th><th>Source</th><th>Note</th><th>By</th></tr></thead>
+    <tbody>
+      {% for m in movements %}
+      <tr>
+        <td>{{ m.created_at|datetime }}</td>
+        <td class="num">{{ '+' if m.delta > 0 else '' }}{{ m.delta }}</td>
+        <td>
+          {% if m.ref_type == 'sale' and m.ref_id %}<a href="/sales/{{ m.ref_id }}">sale</a>
+          {% elif m.ref_type == 'purchase' and m.ref_id %}<a href="/purchases/{{ m.ref_id }}">purchase</a>
+          {% elif m.ref_type == 'service' and m.ref_id %}<a href="/services/{{ m.ref_id }}">service</a>
+          {% else %}{{ m.ref_type.replace('_', ' ') }}{% endif %}
+        </td>
+        <td>{{ m.note }}</td>
+        <td>{{ m.user_name or '—' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">No movements yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+{% endblock %}

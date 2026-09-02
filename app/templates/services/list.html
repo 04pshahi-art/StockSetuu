@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Service jobs · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Service jobs</h1>
+    <p class="sub">Installation and repair work. Pending jobs are listed first.</p>
+  </div>
+  <a class="btn btn-primary" href="/services/new">+ New job</a>
+</div>
+
+<div class="tiles tiles-3">
+  <div class="tile {{ 'tile-warn' if summary.pending else '' }}">
+    <span class="tile-label">Pending</span>
+    <span class="tile-value">{{ summary.pending }}</span>
+    <span class="tile-foot"><a href="/services?status=pending">Show these</a></span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Completed</span>
+    <span class="tile-value">{{ summary.completed }}</span>
+    <span class="tile-foot"><a href="/services?status=completed">Show these</a></span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Billed on these jobs</span>
+    <span class="tile-value">{{ summary.total|money(symbol=True) }}</span>
+    <span class="tile-foot">Labour with GST, plus parts. Cancelled jobs excluded.</span>
+  </div>
+</div>
+
+<form class="filters" method="get" action="/services">
+  <label class="grow">Search
+    <input type="search" name="q" value="{{ term }}"
+           placeholder="Customer, phone, job number, description…">
+  </label>
+  <label>Status
+    <select name="status">
+      <option value="">Any</option>
+      <option value="pending" {{ 'selected' if status == 'pending' else '' }}>Pending</option>
+      <option value="completed" {{ 'selected' if status == 'completed' else '' }}>Completed</option>
+      <option value="cancelled" {{ 'selected' if status == 'cancelled' else '' }}>Cancelled</option>
+    </select>
+  </label>
+  <label>From <input type="date" name="from" value="{{ date_from }}"></label>
+  <label>To <input type="date" name="to" value="{{ date_to }}"></label>
+  <button class="btn btn-primary" type="submit">Apply</button>
+  <a class="btn btn-quiet" href="/services">Clear</a>
+</form>
+
+<div class="card flush">
+  <div class="tablewrap">
+  <table class="table stack">
+    <thead>
+      <tr>
+        <th>Job</th><th>Customer</th><th>Date</th><th>Work</th>
+        <th class="num">Parts</th><th class="num">Total</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for j in jobs %}
+      <tr class="{{ 'row-void' if j.status == 'cancelled' else ('row-warn' if j.status == 'pending' else '') }}">
+        <td><a class="mono" href="/services/{{ j.id }}">{{ j.job_number }}</a></td>
+        <td>{{ j.customer_name }}<small>{{ j.customer_phone or '' }}</small></td>
+        <td>{{ j.job_date|date }}</td>
+        <td class="wrap">{{ j.description[:90] }}{{ '…' if j.description|length > 90 else '' }}</td>
+        <td class="num">{{ j.part_count }}</td>
+        <td class="num"><strong>{{ j.total_paise|money }}</strong></td>
+        <td>
+          {% if j.status == 'pending' %}<span class="pill pill-warn">pending</span>
+          {% elif j.status == 'completed' %}<span class="pill pill-ok">completed</span>
+          {% else %}<span class="pill pill-danger">cancelled</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">
+        No service jobs match. <a href="/services/new">Log one</a>.
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% endblock %}

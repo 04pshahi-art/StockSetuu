@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}New sale · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>New sale</h1>
+    <p class="sub">Scan items in, fill the customer if they want a GST invoice, save.
+      The invoice number is issued by the app in an unbroken series.</p>
+  </div>
+  <a class="btn btn-quiet" href="/sales">Cancel</a>
+</div>
+
+<form method="post" action="/sales"
+      data-line-editor="sale"
+      data-price-field="unit_price"
+      data-shop-state="{{ shop_state }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="lines_json" value="[]" data-lines-json>
+
+  <section class="card">
+    <h2>Items</h2>
+    <div class="scanbar">
+      <label>Scan barcode
+        <input data-scan autocomplete="off" spellcheck="false"
+               placeholder="Point the scanner here and shoot">
+      </label>
+      <span class="scanhint">Scan as many as you like — the same item scanned twice just
+        increases its quantity.</span>
+    </div>
+    <div class="formgrid">
+      <label class="span2">…or search by name / SKU
+        <input data-search autocomplete="off" placeholder="Type at least 2 characters">
+      </label>
+    </div>
+    <div class="btn-row" data-search-results style="margin-bottom: 12px"></div>
+    <p class="fineprint"><a href="/products/new" data-new-product>Create a product</a>
+      if a scanned code is not in the catalogue.</p>
+
+    <div class="tablewrap">
+      <table class="lines">
+        <thead>
+          <tr>
+            <th>Item</th><th>HSN</th><th class="num">Qty</th><th class="num">Rate</th>
+            <th class="num">Discount</th><th>GST</th><th class="num">Line total</th><th></th>
+          </tr>
+        </thead>
+        <tbody data-lines-body></tbody>
+      </table>
+    </div>
+    <p class="fineprint" data-line-count></p>
+  </section>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Customer</h2>
+      <div class="formgrid">
+        <label>Invoice date *
+          <input name="invoice_date" type="date" value="{{ today }}" required>
+        </label>
+        <label>Payment mode
+          <select name="payment_mode">
+            {% for mode in PAYMENT_MODES %}
+            <option value="{{ mode }}">{{ mode }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="span2">Name
+          <input name="customer_name" placeholder="Leave blank for a cash counter sale"
+                 autocomplete="off">
+        </label>
+        <label>Phone
+          <input name="customer_phone" inputmode="tel" autocomplete="off">
+          <span class="hint">Worth filling in — warranty lookups search on it.</span>
+        </label>
+        <label>GSTIN (only if they want input credit)
+          <input name="customer_gstin" maxlength="15" autocomplete="off"
+                 spellcheck="false" style="text-transform: uppercase">
+          <span class="hint">Checked for a valid check digit. Filling it sets the state below.</span>
+        </label>
+        <label>Place of supply
+          <select name="customer_state_code">
+            <option value="">Maharashtra (walk-in / not stated)</option>
+            {% for code, name in STATES %}
+            <option value="{{ code }}">{{ code }} — {{ name }}</option>
+            {% endfor %}
+          </select>
+          <span class="hint">Maharashtra or blank charges CGST + SGST. Any other state
+            charges IGST at the full rate.</span>
+        </label>
+        <label class="span-all">Address
+          <textarea name="customer_address" rows="2"
+                    placeholder="Needed on the invoice for a registered buyer"></textarea>
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Totals</h2>
+      <div data-totals></div>
+      <hr style="border: 0; border-top: 1px solid var(--line); margin: 14px 0">
+      <label class="check">
+        <input type="checkbox" name="prices_include_gst" value="1"
+               {{ 'checked' if prices_include_gst else '' }}>
+        Rates above already include GST (work backwards from them)
+      </label>
+      <label class="check">
+        <input type="checkbox" name="round_to_rupee" value="1"
+               {{ 'checked' if round_to_rupee else '' }}>
+        Round the invoice total to the nearest rupee
+      </label>
+      <label>Notes (printed on the invoice)
+        <textarea name="notes" rows="2"></textarea>
+      </label>
+    </section>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" type="submit">Save &amp; print invoice</button>
+    <a class="btn btn-quiet" href="/sales">Cancel</a>
+  </div>
+  <p class="fineprint">Saving deducts stock, assigns the serial numbers you entered, and issues
+    the next invoice number for {{ today[:4] }}. Nothing can be edited afterwards — a wrong
+    invoice is cancelled and re-issued, so the numbering stays intact.</p>
+</form>
+
+{% endblock %}

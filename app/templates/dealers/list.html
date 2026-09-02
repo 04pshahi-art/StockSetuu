@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Dealers · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Dealers &amp; suppliers</h1>
+    <p class="sub">Prices are recorded per bill, not fixed against the dealer — so you can
+      compare what each one charged for the same part.</p>
+  </div>
+  <div class="pageactions">
+    <a class="btn btn-primary" href="/dealers/new">+ New dealer</a>
+    <a class="btn" href="/reports/dealers">Purchase history report</a>
+  </div>
+</div>
+
+<form class="filters" method="get" action="/dealers">
+  <label class="grow">Search
+    <input type="search" name="q" value="{{ term }}" placeholder="Name, GSTIN, phone, notes…">
+  </label>
+  <button class="btn btn-primary" type="submit">Search</button>
+  <a class="btn btn-quiet" href="/dealers">Clear</a>
+</form>
+
+<div class="card flush">
+  <div class="tablewrap">
+  <table class="table stack">
+    <thead>
+      <tr><th>Dealer</th><th>GSTIN / State</th><th class="num">Bills</th>
+        <th class="num">Total bought</th><th>Last bill</th><th class="actions">&nbsp;</th></tr>
+    </thead>
+    <tbody>
+      {% for d in dealers %}
+      <tr class="{{ '' if d.is_active else 'row-void' }}">
+        <td>
+          <a href="/dealers/{{ d.id }}">{{ d.name }}</a>
+          <small>{{ d.contact_number or 'no phone' }}{% if not d.is_active %} · inactive{% endif %}</small>
+        </td>
+        <td>
+          {% if d.gstin %}<span class="mono">{{ d.gstin }}</span>{% else %}<span class="pill pill-warn">no GSTIN</span>{% endif %}
+          <small>{{ d.state_code|state if d.state_code else 'state not set' }}</small>
+        </td>
+        <td class="num">{{ d.bill_count }}</td>
+        <td class="num">{{ d.total_paise|money }}</td>
+        <td>{{ d.last_bill_date|date if d.last_bill_date else '—' }}</td>
+        <td class="actions"><a class="btn btn-sm" href="/dealers/{{ d.id }}/edit">Edit</a></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty">No dealers yet. <a href="/dealers/new">Add the first</a>.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% endblock %}

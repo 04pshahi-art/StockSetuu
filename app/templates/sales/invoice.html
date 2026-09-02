@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}{{ sale.invoice_number }} · Tax invoice{% endblock %}
+{% block content %}
+
+{% set buyer_state = sale.customer_state_code or shop.state_code or '27' %}
+
+<div class="pagehead noprint">
+  <div>
+    <h1>Tax invoice {{ sale.invoice_number }}</h1>
+    <p class="sub">Print this, or choose “Save as PDF” in the print dialog. A4, no extra software.</p>
+  </div>
+  <div class="pageactions">
+    <button class="btn btn-primary" type="button" data-print>Print / Save as PDF</button>
+    <a class="btn" href="/sales/{{ sale.id }}/invoice?copy=Duplicate+for+Transporter">Duplicate copy</a>
+    <a class="btn" href="/sales/{{ sale.id }}/invoice?copy=Triplicate+for+Supplier">Triplicate copy</a>
+    <a class="btn btn-quiet" href="/sales/{{ sale.id }}">Sale record</a>
+  </div>
+</div>
+
+<div class="invoice {{ 'inv-void' if sale.is_void else '' }}">
+
+  <div class="inv-head">
+    <div class="inv-seller">
+      <strong>{{ shop.trade_name or shop.legal_name }}</strong>
+      {% if shop.legal_name and shop.trade_name and shop.legal_name != shop.trade_name %}
+      <div>Proprietor: {{ shop.legal_name }}</div>
+      {% endif %}
+      <div>
+        {{ shop.address_line1 }}{% if shop.address_line2 %}, {{ shop.address_line2 }}{% endif %}
+        {%- if shop.city %}, {{ shop.city }}{% endif %}
+        {%- if shop.pincode %} - {{ shop.pincode }}{% endif %}
+      </div>
+      <div>{{ shop.state_code|state }} (State code {{ shop.state_code }})</div>
+      <div>
+        {% if shop.phone %}Ph: {{ shop.phone }}{% endif %}
+        {% if shop.email %} · {{ shop.email }}{% endif %}
+      </div>
+      <div><strong>GSTIN: {{ shop.gstin or 'not set' }}</strong>
+        {% if shop.registration_type %} · {{ shop.registration_type }}{% endif %}</div>
+    </div>
+    <div class="inv-title">
+      <h1>Tax Invoice</h1>
+      <div class="copy">{{ copy_label }}</div>
+      {% if sale.is_void %}<div class="copy"><strong>CANCELLED</strong></div>{% endif %}
+    </div>
+    <div class="inv-meta">
+      <div><strong>Invoice no:</strong> {{ sale.invoice_number }}</div>
+      <div><strong>Date:</strong> {{ sale.invoice_date|date }}</div>
+      <div><strong>Place of supply:</strong> {{ buyer_state|state }} ({{ buyer_state }})</div>
+      <div><strong>Supply type:</strong> {{ 'Inter-state' if sale.interstate else 'Intra-state' }}</div>
+      <div><strong>Payment:</strong> {{ sale.payment_mode }}</div>
+      <div><strong>Reverse charge:</strong> No</div>
+    </div>
+  </div>
+
+  <div class="inv-parties">
+    <div class="inv-party">
+      <h3>Billed to</h3>
+      <div><strong>{{ sale.customer_name or 'Cash / counter sale' }}</strong></div>
+      {% if sale.customer_address %}
+      <div>{{ sale.customer_address|replace('\n', ', ') }}</div>
+      {% endif %}
+      {% if sale.customer_phone %}<div>Ph: {{ sale.customer_phone }}</div>{% endif %}
+      <div>GSTIN: {{ sale.customer_gstin or 'Unregistered' }}</div>
+      <div>State: {{ buyer_state|state }} ({{ buyer_state }})</div>
+    </div>
+    <div class="inv-party">
+      <h3>Shipped to</h3>
+      <div>Same as billed to</div>
+      {% if shop.bank_details %}
+      <h3 style="margin-top: 6px">Bank details</h3>
+      <div>{{ shop.bank_details|replace('\n', ' · ') }}</div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# A GST invoice carries twelve columns of figures and cannot be squeezed onto a phone.
+     The wrapper lets just this table slide sideways instead of pushing the whole page off
+     the screen; in print it is inert, so the paper copy is unchanged. #}
+  <div class="inv-scroll">
+  <table class="inv-table">
+    <thead>
+      <tr>
+        <th rowspan="2">#</th>
+        <th rowspan="2">Description of goods</th>
+        <th rowspan="2">HSN</th>
+        <th class="num" rowspan="2">Qty</th>
+        <th class="num" rowspan="2">Rate</th>
+        <th class="num" rowspan="2">Disc.</th>
+        <th class="num" rowspan="2">Taxable<br>value</th>
+        {% if sale.interstate %}
+        <th colspan="2">IGST</th>
+        {% else %}
+        <th colspan="2">CGST</th>
+        <th colspan="2">SGST</th>
+        {% endif %}
+        <th class="num" rowspan="2">Total</th>
+      </tr>
+      <tr>
+        {% if sale.interstate %}
+        <th class="num">%</th><th class="num">Amt</th>
+        {% else %}
+        <th class="num">%</th><th class="num">Amt</th>
+        <th class="num">%</th><th class="num">Amt</th>
+        {% endif %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in items %}
+      <tr>
+        <td class="ctr">{{ loop.index }}</td>
+        <td>
+          {{ i.description or i.product_name }}
+          {% set serials = serials_by_item.get(i.id, []) %}
+          {% if serials %}
+          <span class="serials">Sl: {{ serials|join(', ') }}</span>
+          {% endif %}
+        </td>
+        <td class="ctr">{{ i.hsn_code or '—' }}</td>
+        <td class="num">{{ i.qty }} {{ i.unit }}</td>
+        <td class="num">{{ i.unit_price_paise|money }}</td>
+        <td class="num">{{ i.discount_paise|money if i.discount_paise else '—' }}</td>
+        <td class="num">{{ i.taxable_paise|money }}</td>
+        {% if sale.interstate %}
+        <td class="num">{{ i.gst_rate_bp|rate }}</td>
+        <td class="num">{{ i.igst_paise|money }}</td>
+        {% else %}
+        <td class="num">{{ (i.gst_rate_bp // 2)|rate }}</td>
+        <td class="num">{{ i.cgst_paise|money }}</td>
+        <td class="num">{{ (i.gst_rate_bp // 2)|rate }}</td>
+        <td class="num">{{ i.sgst_paise|money }}</td>
+        {% endif %}
+        <td class="num">{{ i.total_paise|money }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <td colspan="6" class="num">Total</td>
+        <td class="num">{{ sale.taxable_paise|money }}</td>
+        {% if sale.interstate %}
+        <td></td><td class="num">{{ sale.igst_paise|money }}</td>
+        {% else %}
+        <td></td><td class="num">{{ sale.cgst_paise|money }}</td>
+        <td></td><td class="num">{{ sale.sgst_paise|money }}</td>
+        {% endif %}
+        <td class="num">{{ (sale.taxable_paise + sale.cgst_paise + sale.sgst_paise + sale.igst_paise)|money }}</td>
+      </tr>
+    </tfoot>
+  </table>
+  </div>
+
+  <div class="inv-bottom">
+    <div class="inv-left">
+      <h3 style="margin: 0 0 4px; font-size: 10px; text-transform: uppercase">HSN summary</h3>
+      <table class="inv-table" style="margin: 0">
+        <thead>
+          <tr>
+            <th>HSN</th><th class="num">Taxable</th>
+            {% if sale.interstate %}<th class="num">IGST</th>
+            {% else %}<th class="num">CGST</th><th class="num">SGST</th>{% endif %}
+            <th class="num">Total tax</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for h in hsn_rows %}
+          <tr>
+            <td>{{ h.hsn_code }} <small>@ {{ h.rate_bp|rate }}</small></td>
+            <td class="num">{{ h.taxable_paise|money }}</td>
+            {% if sale.interstate %}
+            <td class="num">{{ h.igst_paise|money }}</td>
+            {% else %}
+            <td class="num">{{ h.cgst_paise|money }}</td>
+            <td class="num">{{ h.sgst_paise|money }}</td>
+            {% endif %}
+            <td class="num">{{ (h.cgst_paise + h.sgst_paise + h.igst_paise)|money }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="inv-right">
+      <table>
+        <tr><td>Taxable value</td><td>{{ sale.taxable_paise|money }}</td></tr>
+        {% if sale.interstate %}
+        <tr><td>IGST</td><td>{{ sale.igst_paise|money }}</td></tr>
+        {% else %}
+        <tr><td>CGST</td><td>{{ sale.cgst_paise|money }}</td></tr>
+        <tr><td>SGST</td><td>{{ sale.sgst_paise|money }}</td></tr>
+        {% endif %}
+        {% if sale.round_off_paise %}
+        <tr><td>Round off</td><td>{{ sale.round_off_paise|money }}</td></tr>
+        {% endif %}
+        <tr class="grand"><td>Grand total</td><td>₹ {{ sale.total_paise|money }}</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="inv-words">
+    <strong>Amount in words:</strong> {{ sale.total_paise|words }}
+  </div>
+
+  {% if sale.notes %}
+  <div class="inv-words"><strong>Note:</strong> {{ sale.notes }}</div>
+  {% endif %}
+
+  <div class="inv-bottom">
+    <div class="inv-left">
+      <h3 style="margin: 0 0 4px; font-size: 10px; text-transform: uppercase">Terms</h3>
+      <div>{{ shop.invoice_terms or 'Goods once sold are not returnable. Warranty as per manufacturer / brand terms only.' }}</div>
+    </div>
+    <div class="inv-right" style="display: flex; flex-direction: column; justify-content: space-between">
+      <div style="text-align: right">For <strong>{{ shop.trade_name or shop.legal_name }}</strong></div>
+      <div style="text-align: right; margin-top: 34px; border-top: 1px solid #000; padding-top: 3px">
+        Authorised signatory
+      </div>
+    </div>
+  </div>
+
+  <div class="inv-foot">
+    Declaration: we declare that this invoice shows the actual price of the goods described and
+    that all particulars are true and correct.
+    {% if sale.is_void %}<br><strong>This invoice has been cancelled and is not valid.</strong>{% endif %}
+  </div>
+</div>
+
+{% endblock %}

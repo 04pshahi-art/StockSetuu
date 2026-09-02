@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · {{ shop.trade_name or 'Shop Management System' }}</title>
+<link rel="stylesheet" href="/static/app.css?v={{ asset_version() }}">
+<link rel="icon" href="data:,">
+</head>
+<body class="loginpage">
+<main class="loginbox">
+  <h1>{{ shop.trade_name or 'Shop Management System' }}</h1>
+  <p class="sub">{{ shop.legal_name }}{% if shop.gstin %} · GSTIN {{ shop.gstin }}{% endif %}</p>
+
+  {% if timed_out %}
+  <div class="flash err">Signed out after inactivity. Please sign in again.</div>
+  {% endif %}
+  {% if flash_ok %}<div class="flash ok">{{ flash_ok }}</div>{% endif %}
+  {% if flash_error %}<div class="flash err">{{ flash_error }}</div>{% endif %}
+  {% if error %}<div class="flash err">{{ error }}</div>{% endif %}
+
+  {% if not has_users %}
+  <div class="flash warn">
+    No account exists yet. On the server, run:
+    <code>python manage.py create-user</code>
+  </div>
+  {% endif %}
+
+  <form method="post" action="/login" autocomplete="on">
+    <input type="hidden" name="next_url" value="{{ next_url }}">
+    <label>Username
+      <input name="username" value="{{ username|default('') }}" autocomplete="username"
+             autofocus required>
+    </label>
+    <label>Password
+      <input name="password" type="password" autocomplete="current-password" required>
+    </label>
+    <button class="btn btn-primary btn-block" type="submit">Sign in</button>
+  </form>
+
+  <p class="fineprint">
+    Private shop system. Reachable only over your Tailscale network — there is no public
+    sign-up and no account recovery by email.
+  </p>
+</main>
+</body>
+</html>

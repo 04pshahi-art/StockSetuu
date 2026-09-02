@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+{% block title %}Dry run · {{ trade }}{% endblock %}
+{% block content %}
+
+{% set c = analysis.counts %}
+{% set warned = rows|selectattr('warnings')|list|length %}
+
+<div class="pagehead">
+  <div>
+    <h1>Dry run</h1>
+    <p class="sub"><span class="mono">{{ job.filename }}</span> ·
+      {{ analysis.total }} row{{ '' if analysis.total == 1 else 's' }} read ·
+      nothing has been written yet</p>
+  </div>
+  <a class="btn" href="/import/{{ token }}">← Change the mapping</a>
+</div>
+
+<div class="tiles tiles-4">
+  <div class="tile">
+    <span class="tile-label">Will be created</span>
+    <span class="tile-value">{{ c.create }}</span>
+    <span class="tile-foot">New products</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Will be updated</span>
+    <span class="tile-value">{{ c['update'] }}</span>
+    <span class="tile-foot">SKU already in the catalogue</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Will be skipped</span>
+    <span class="tile-value">{{ c.skip }}</span>
+    <span class="tile-foot">Left exactly as they are</span>
+  </div>
+  <div class="tile {{ 'tile-warn' if c.error else '' }}">
+    <span class="tile-label">Cannot be imported</span>
+    <span class="tile-value">{{ c.error }}</span>
+    <span class="tile-foot">
+      {%- if c.error %}These rows are ignored; the rest still import{% else %}Every row is usable{% endif %}
+    </span>
+  </div>
+</div>
+
+<div class="grid2">
+  <section class="card">
+    <h2>Settings for this run</h2>
+    <dl class="kv">
+      <dt>Existing SKUs</dt>
+      <dd>{{ 'Updated from the file' if options.on_existing == 'update' else 'Left untouched' }}</dd>
+      <dt>Quantities</dt>
+      <dd>
+        {% if options.quantity_mode == 'ignore' %}Ignored completely
+        {% elif options.quantity_mode == 'new_only' %}Opening stock for new products only
+        {% else %}<strong>Stock take — existing quantities will be corrected</strong>
+        {% endif %}
+      </dd>
+      <dt>Default category</dt><dd>{{ options.default_category }}</dd>
+      <dt>Default GST rate</dt><dd>{{ options.default_gst_rate_bp|rate }}</dd>
+      <dt>Default low stock</dt><dd>{{ options.default_low_stock }}</dd>
+    </dl>
+    {% if options.quantity_mode == 'set' %}
+    <p class="fineprint">Every quantity change is written to the stock ledger against this file's
+      name, so it can be traced later. It will still contradict anything you have bought or sold
+      since the file was exported.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Columns being used</h2>
+    <table class="table compact">
+      <thead><tr><th>Product field</th><th>Column in the file</th></tr></thead>
+      <tbody>
+        {% for key, header in analysis.mapped.items() %}
+        <tr><th>{{ key.replace('_', ' ')|capitalize }}</th><td class="mono">{{ header }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="fineprint">Any product field not listed here is left untouched on products that
+      already exist, and left at its default on new ones.</p>
+  </section>
+</div>
+
+{% if warned %}
+<div class="flash warn">
+  {{ warned }} row{{ '' if warned == 1 else 's' }} on this page had something that could not be read
+  cleanly — an odd rate, a price with stray characters, a quantity that is not a number. They are
+  marked below and will import with the fallback shown. Worth a look before you confirm.
+</div>
+{% endif %}
+
+<div class="card flush">
+  <div class="cardhead" style="padding: var(--gap) var(--gap) 0">
+    <h2>Row by row</h2>
+    <span class="fineprint">
+      {%- if truncated %}Showing the first {{ rows|length }} of {{ analysis.total }}
+      {%- else %}All {{ rows|length }} rows{% endif %}
+    </span>
+  </div>
+  <div class="tablewrap">
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th class="num">Row</th><th>Action</th><th>SKU</th><th>Name</th><th>Category</th>
+        <th>HSN</th><th class="num">GST</th><th class="num">Cost</th><th class="num">Sale</th>
+        <th class="num">Qty</th><th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      {% set v = r['values'] %}
+      <tr class="{{ 'row-danger' if r.action == 'error' else ('row-warn' if r.warnings else '') }}">
+        <td class="num muted">{{ r.row }}</td>
+        <td>
+          {% if r.action == 'create' %}<span class="pill pill-ok">create</span>
+          {% elif r.action == 'update' %}<span class="pill pill-info">update</span>
+          {% elif r.action == 'skip' %}<span class="pill">skip</span>
+          {% else %}<span class="pill pill-danger">cannot import</span>{% endif %}
+        </td>
+        <td class="mono">{{ v.sku or '—' }}</td>
+        <td>
+          {{ v.name or '—' }}
+          {% if r.existing_name and r.existing_name != v.name %}
+          <small>currently “{{ r.existing_name }}”</small>
+          {% endif %}
+        </td>
+        <td>{{ v.category }}</td>
+        <td class="mono">{{ v.hsn_code or '—' }}</td>
+        <td class="num">{{ v.gst_rate_bp|rate }}</td>
+        <td class="num">{{ v.cost_price_paise|money }}</td>
+        <td class="num">{{ v.sale_price_paise|money }}</td>
+        <td class="num">
+          {% if v.quantity is none %}—
+          {% elif r.action == 'update' %}
+            {% if options.quantity_mode == 'set' %}
+            {{ r.existing_qty }} → <strong>{{ v.quantity }}</strong>
+            {% else %}
+            <span class="muted">{{ v.quantity }} (kept at {{ r.existing_qty }})</span>
+            {% endif %}
+          {% elif options.quantity_mode == 'ignore' %}
+          <span class="muted">{{ v.quantity }} (ignored)</span>
+          {% else %}
+          <strong>{{ v.quantity }}</strong>
+          {% endif %}
+        </td>
+        <td>
+          {% for e in r.errors %}<div class="pill pill-danger">{{ e }}</div>{% endfor %}
+          {% for w in r.warnings %}<div class="pill pill-warn">{{ w }}</div>{% endfor %}
+          {% if not r.errors and not r.warnings %}<span class="muted">—</span>{% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="11" class="empty">No usable rows found in that file.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if truncated %}
+  <p class="fineprint" style="padding: 0 var(--gap) var(--gap)">
+    {{ truncated }} more row{{ '' if truncated == 1 else 's' }} are not shown, to keep this page
+    quick. They are counted in the tiles above and will be imported all the same.
+  </p>
+  {% endif %}
+</div>
+
+<section class="card">
+  <h2>Confirm</h2>
+  {# c['update'], not c.update: on a dict Jinja finds the update() method first. #}
+  {% if c.create or c['update'] %}
+  <form method="post" action="/import/{{ token }}/commit"
+        data-confirm="Import {{ c.create }} new and {{ c['update'] }} updated products?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <input type="hidden" name="confirm" value="yes">
+    <button class="btn btn-primary" type="submit">
+      Import {{ c.create }} new and {{ c['update'] }} updated product{{ '' if (c.create + c['update']) == 1 else 's' }}
+    </button>
+    <a class="btn btn-quiet" href="/import/{{ token }}">Go back and change something</a>
+  </form>
+  <p class="fineprint">Written in a single transaction: if any row fails while saving, the whole
+    import is undone and the catalogue is left exactly as it is now. The uploaded file is discarded
+    once the import finishes.</p>
+  {% else %}
+  <p class="empty">Nothing here would change the catalogue.
+    <a href="/import/{{ token }}">Check the mapping</a> — the SKU and name columns are the two that
+    have to be right.</p>
+  {% endif %}
+</section>
+
+{% endblock %}

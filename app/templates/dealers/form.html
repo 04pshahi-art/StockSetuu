@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ 'New dealer' if is_new else dealer.name }} · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <h1>{{ 'New dealer' if is_new else 'Edit ' ~ dealer.name }}</h1>
+  <a class="btn btn-quiet" href="{{ '/dealers' if is_new else '/dealers/' ~ dealer.id }}">Cancel</a>
+</div>
+
+<form class="card narrow" method="post" action="{{ '/dealers' if is_new else '/dealers/' ~ dealer.id }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <div class="formgrid">
+    <label class="span2">Dealer name *
+      <input name="name" value="{{ dealer.name }}" required autofocus>
+    </label>
+    <label>Contact number
+      <input name="contact_number" value="{{ dealer.contact_number }}" inputmode="tel">
+    </label>
+    <label>GSTIN
+      <input name="gstin" value="{{ dealer.gstin }}" maxlength="15" spellcheck="false"
+             style="text-transform: uppercase" autocomplete="off">
+      <span class="hint">Optional, but needed to claim input tax credit on their bills.
+        Checked for the official format and check digit.</span>
+    </label>
+    <label>State
+      <select name="state_code">
+        <option value="">— not set —</option>
+        {% for code, name in STATES %}
+        <option value="{{ code }}" {{ 'selected' if code == dealer.state_code else '' }}>{{ code }} · {{ name }}</option>
+        {% endfor %}
+      </select>
+      <span class="hint">Decides CGST+SGST versus IGST on their bills. Left blank, it is
+        taken from the GSTIN's first two digits.</span>
+    </label>
+    <label class="span-all">Address
+      <textarea name="address" rows="3">{{ dealer.address }}</textarea>
+    </label>
+    <label class="span-all">Notes
+      <textarea name="notes" rows="3"
+        placeholder="Payment terms, who to call, which brands they stock…">{{ dealer.notes }}</textarea>
+    </label>
+    <label class="span-all check">
+      <input type="checkbox" name="is_active" value="1" {{ 'checked' if dealer.is_active else '' }}>
+      Active (uncheck to hide from the purchase screen, keeping all past bills)
+    </label>
+  </div>
+  <button class="btn btn-primary" type="submit">{{ 'Create dealer' if is_new else 'Save changes' }}</button>
+</form>
+
+{% endblock %}

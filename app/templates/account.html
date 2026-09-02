@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Your login · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Your login</h1>
+    <p class="sub">One account runs the shop. There is no sign-up page and no email reset —
+      a forgotten password is reset from the server with
+      <span class="mono">python manage.py set-password</span>.</p>
+  </div>
+  <a class="btn" href="/settings">Shop settings</a>
+</div>
+
+<div class="grid2">
+  <section class="card">
+    <h2>Account</h2>
+    <dl class="kv">
+      <dt>Username</dt><dd class="mono">{{ account.username }}</dd>
+      <dt>Name</dt><dd>{{ account.display_name or '—' }}</dd>
+      <dt>Last sign-in</dt><dd>{{ account.last_login_at|datetime if account.last_login_at else 'this is the first' }}</dd>
+      <dt>Created</dt><dd>{{ account.created_at|datetime }}</dd>
+      <dt>Auto sign-out</dt><dd>After {{ idle_minutes }} minutes of inactivity</dd>
+      <dt>Password stored as</dt><dd>{{ hash_backend }} hash with a per-user salt</dd>
+    </dl>
+    <form method="post" action="/account/display-name" class="filters" style="margin: 0">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label class="grow">Display name
+        <input name="display_name" value="{{ account.display_name }}">
+      </label>
+      <button class="btn btn-primary" type="submit">Save</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Change password</h2>
+    <form method="post" action="/account/password">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="formgrid">
+        <label class="span-all">Current password
+          <input name="current_password" type="password" required autocomplete="current-password">
+        </label>
+        <label class="span-all">New password
+          <input name="new_password" type="password" required autocomplete="new-password"
+                 minlength="10">
+          <span class="hint">At least 10 characters, and not only digits.</span>
+        </label>
+        <label class="span-all">Repeat the new password
+          <input name="confirm_password" type="password" required autocomplete="new-password">
+        </label>
+      </div>
+      <button class="btn btn-primary" type="submit">Change password</button>
+      <p class="fineprint">Changing the password signs out every device, including your phone —
+        so you will be asked to sign in again here.</p>
+    </form>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Keeping this safe</h2>
+  <ul class="prose">
+    <li>The app is not on the public internet. It answers only on the server's own network and
+      over Tailscale, so there is no login page for anyone else to find.</li>
+    <li>The database file is encrypted at rest, so a copied file is useless without the key.
+      The key lives in the server's environment, not in the database.</li>
+    <li>Failed sign-ins are counted and the account locks itself for a while after too many —
+      that stops someone on your Tailscale network guessing the password.</li>
+    <li>Every sign-in, price change and cancelled invoice is written to the
+      <a href="/reports/audit">audit log</a>.</li>
+  </ul>
+</section>
+
+{% endblock %}

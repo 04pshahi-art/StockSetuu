@@ -1,0 +1,78 @@
+{% set trade = shop.trade_name or 'Shop Management System' %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>{% block title %}{{ trade }}{% endblock %}</title>
+<link rel="stylesheet" href="/static/app.css?v={{ asset_version() }}">
+<link rel="icon" href="data:,">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+
+<header class="topbar noprint">
+  <button class="menu-toggle" id="menuToggle" aria-label="Menu" aria-expanded="false">☰</button>
+  <a class="brand" href="/">
+    <strong>{{ trade }}</strong>
+    <span>{{ shop.gstin or 'GSTIN not set' }}</span>
+  </a>
+  <form class="topsearch" action="/products" method="get" role="search">
+    <input type="search" name="q" placeholder="Search products…" aria-label="Search products">
+  </form>
+  <div class="topactions">
+    <a class="btn btn-primary" href="/sales/new">+ Sale</a>
+    <a class="btn" href="/account">{{ (user.display_name or user.username) if user else '' }}</a>
+    <form method="post" action="/logout" class="inline">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <button class="btn btn-quiet" type="submit">Sign out</button>
+    </form>
+  </div>
+</header>
+
+<div class="shell">
+  <nav class="sidebar noprint" id="sidebar" aria-label="Main navigation">
+    {% set nav = [
+      ('/', 'Dashboard', '▦'),
+      ('/products', 'Products', '▩'),
+      ('/purchases', 'Purchases', '⬇'),
+      ('/sales', 'Sales &amp; Invoices', '⬆'),
+      ('/serials', 'Serials', '#'),
+      ('/warranty', 'Warranty lookup', '✓'),
+      ('/services', 'Service jobs', '⚙'),
+      ('/dealers', 'Dealers', '☰'),
+      ('/reports', 'Reports &amp; GST', '∑'),
+      ('/import', 'Import from Tally', '⇪'),
+      ('/settings', 'Shop settings', '⚑'),
+    ] %}
+    <ul>
+      {% for href, label, icon in nav %}
+      {% set active = (path == href) or (href != '/' and path.startswith(href)) %}
+      <li><a href="{{ href }}" class="{{ 'active' if active else '' }}"><i>{{ icon }}</i>{{ label|safe }}</a></li>
+      {% endfor %}
+    </ul>
+    {% if db_status and not db_status.encrypted %}
+    <p class="sidebar-warn" title="{{ db_status.detail }}">⚠ Database not encrypted</p>
+    {% endif %}
+  </nav>
+
+  <main id="main" class="content">
+    {% if flash_ok %}<div class="flash ok noprint">{{ flash_ok }}</div>{% endif %}
+    {% if flash_error %}<div class="flash err noprint">{{ flash_error }}</div>{% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<nav class="bottomnav noprint" aria-label="Quick navigation">
+  <a href="/" class="{{ 'active' if path == '/' else '' }}"><i>▦</i>Home</a>
+  <a href="/sales/new" class="{{ 'active' if path.startswith('/sales/new') else '' }}"><i>⬆</i>Sale</a>
+  <a href="/purchases/new" class="{{ 'active' if path.startswith('/purchases/new') else '' }}"><i>⬇</i>Buy</a>
+  <a href="/products" class="{{ 'active' if path.startswith('/products') else '' }}"><i>▩</i>Stock</a>
+  <a href="/warranty" class="{{ 'active' if path.startswith('/warranty') else '' }}"><i>✓</i>Warranty</a>
+</nav>
+
+<script src="/static/app.js?v={{ asset_version() }}" defer></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

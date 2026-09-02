@@ -1,0 +1,274 @@
+{% extends "base.html" %}
+{% block title %}GST sales register · {{ trade }}{% endblock %}
+{% block content %}
+
+{% set qs = '?from=' ~ date_from ~ '&to=' ~ date_to %}
+
+<div class="pagehead">
+  <div>
+    <h1>GST sales register</h1>
+    <p class="sub">
+      {{ shop.legal_name }}
+      {%- if shop.gstin %} · GSTIN <span class="mono">{{ shop.gstin }}</span>{% endif %}
+      · {{ date_from|date }} to {{ date_to|date }}
+    </p>
+  </div>
+  <div class="pageactions">
+    <a class="btn" href="/reports/gst/sales{{ qs }}&format=csv">Export CSV</a>
+    <button class="btn" type="button" data-print>Print</button>
+  </div>
+</div>
+
+<form class="filters noprint" method="get" action="/reports/gst/sales">
+  <label>From <input type="date" name="from" value="{{ date_from }}"></label>
+  <label>To <input type="date" name="to" value="{{ date_to }}"></label>
+  <button class="btn btn-primary" type="submit">Apply</button>
+  <a class="btn btn-quiet" href="/reports/gst/sales">This month</a>
+</form>
+
+<div class="flash warn noprint">
+  <strong>This app does not file returns.</strong> These are your own figures, laid out the way
+  GSTR-1 asks for them so they can be keyed in or handed to your accountant. Check them against the
+  portal before you file, and file within the due date regardless of what this screen says.
+</div>
+
+<div class="tiles tiles-4">
+  <div class="tile">
+    <span class="tile-label">Taxable value</span>
+    <span class="tile-value">{{ totals.taxable|money(symbol=True) }}</span>
+    <span class="tile-foot">{{ totals.count }} invoice{{ '' if totals.count == 1 else 's' }}</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">CGST + SGST</span>
+    <span class="tile-value">{{ (totals.cgst + totals.sgst)|money(symbol=True) }}</span>
+    <span class="tile-foot">{{ totals.cgst|money(symbol=True) }} each half</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">IGST</span>
+    <span class="tile-value">{{ totals.igst|money(symbol=True) }}</span>
+    <span class="tile-foot">Inter-state supplies</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Invoice value</span>
+    <span class="tile-value">{{ totals.total|money(symbol=True) }}</span>
+    <span class="tile-foot">
+      {%- if totals.round_off %}Includes {{ totals.round_off|money(symbol=True) }} round-off
+      {%- else %}Taxable + GST{% endif %}
+    </span>
+  </div>
+</div>
+
+{% if totals.cancelled %}
+<p class="fineprint">{{ totals.cancelled }} cancelled invoice{{ '' if totals.cancelled == 1 else 's' }}
+  in this period. They are listed at the bottom with their numbers intact and contribute nothing to
+  any total — that is what keeps the series gap-free.</p>
+{% endif %}
+
+<div class="grid2">
+  <section class="card">
+    <h2>Rate-wise summary</h2>
+    <table class="table compact">
+      <thead>
+        <tr><th class="num">Rate</th><th class="num">Taxable</th><th class="num">CGST</th>
+          <th class="num">SGST</th><th class="num">IGST</th></tr>
+      </thead>
+      <tbody>
+        {% for r in rate_rows %}
+        <tr>
+          <th class="num">{{ r.rate_bp|rate }}</th>
+          <td class="num">{{ r.taxable|money }}</td>
+          <td class="num">{{ r.cgst|money }}</td>
+          <td class="num">{{ r.sgst|money }}</td>
+          <td class="num">{{ r.igst|money }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="empty">Nothing sold in this range.</td></tr>
+        {% endfor %}
+      </tbody>
+      {% if rate_rows %}
+      <tfoot>
+        <tr><th class="num">Total</th>
+          <th class="num">{{ totals.taxable|money }}</th>
+          <th class="num">{{ totals.cgst|money }}</th>
+          <th class="num">{{ totals.sgst|money }}</th>
+          <th class="num">{{ totals.igst|money }}</th>
+        </tr>
+      </tfoot>
+      {% endif %}
+    </table>
+    <p class="fineprint">Summed from the invoice lines, so a single invoice with items at two rates
+      appears in both rows. This is the shape GSTR-1's rate-wise tables want.</p>
+  </section>
+
+  <section class="card">
+    <h2>Registered and unregistered buyers</h2>
+    <table class="table compact">
+      <thead>
+        <tr><th>Buyer type</th><th class="num">Invoices</th><th class="num">Taxable</th><th class="num">GST</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th>B2B — buyer's GSTIN on the invoice</th>
+          <td class="num">{{ split.b2b_count }}</td>
+          <td class="num">{{ split.b2b_taxable|money }}</td>
+          <td class="num">{{ split.b2b_tax|money }}</td>
+        </tr>
+        <tr>
+          <th>B2C — walk-in, no GSTIN</th>
+          <td class="num">{{ split.b2c_count }}</td>
+          <td class="num">{{ split.b2c_taxable|money }}</td>
+          <td class="num">{{ split.b2c_tax|money }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="fineprint">GSTR-1 reports these in different tables: B2B invoice by invoice, B2C
+      normally as a consolidated figure. Every B2B invoice below is listed individually so the
+      buyer's GSTIN can be copied across exactly — a wrong GSTIN there denies your customer their
+      credit.</p>
+  </section>
+</div>
+
+<section class="card">
+  <div class="cardhead">
+    <h2>HSN-wise summary</h2>
+    <span class="fineprint">GSTR-1 table 12</span>
+  </div>
+  <div class="tablewrap">
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>HSN</th><th class="num">Rate</th><th class="num">Qty</th><th>Unit</th>
+        <th class="num">Taxable</th><th class="num">CGST</th><th class="num">SGST</th><th class="num">IGST</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for h in hsn_rows %}
+      <tr>
+        <td class="mono">{{ h.hsn_code }}</td>
+        <td class="num">{{ h.rate_bp|rate }}</td>
+        <td class="num">{{ h.qty }}</td>
+        <td>{{ h.unit }}</td>
+        <td class="num">{{ h.taxable|money }}</td>
+        <td class="num">{{ h.cgst|money }}</td>
+        <td class="num">{{ h.sgst|money }}</td>
+        <td class="num">{{ h.igst|money }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="empty">Nothing sold in this range.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% if hsn_rows|selectattr('hsn_code', 'equalto', '—')|list %}
+  <p class="fineprint"><strong>Some lines have no HSN code.</strong> They are grouped under “—” above.
+    HSN is mandatory on the invoice and in this summary, so fill it in on those products — the
+    <a href="/products?missing=hsn">products screen</a> can list them.</p>
+  {% endif %}
+</section>
+
+<div class="grid2">
+  <section class="card">
+    <h2>Place of supply</h2>
+    <table class="table compact">
+      <thead>
+        <tr><th>State</th><th class="num">Invoices</th><th class="num">Taxable</th><th class="num">IGST</th></tr>
+      </thead>
+      <tbody>
+        {% for s in state_rows %}
+        <tr>
+          <td>{{ s.code|state }}
+            {% if s.code == shop.state_code %}<span class="pill">home state</span>{% endif %}
+          </td>
+          <td class="num">{{ s.invoices }}</td>
+          <td class="num">{{ s.taxable|money }}</td>
+          <td class="num">{{ s.igst|money if s.igst else '—' }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="4" class="empty">Nothing sold in this range.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="fineprint">Anything in {{ shop.state_code|state }} is CGST + SGST. Everything else is
+      IGST, and GSTR-1 wants the unregistered part of it broken up by state.</p>
+  </section>
+
+  <section class="card">
+    <h2>Service jobs — reported separately</h2>
+    <table class="table compact">
+      <thead>
+        <tr><th class="num">Jobs</th><th class="num">Charges</th><th class="num">CGST</th>
+          <th class="num">SGST</th><th class="num">IGST</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num">{{ service_rows.jobs }}</td>
+          <td class="num">{{ service_rows.taxable|money }}</td>
+          <td class="num">{{ service_rows.cgst|money }}</td>
+          <td class="num">{{ service_rows.sgst|money }}</td>
+          <td class="num">{{ service_rows.igst|money }}</td>
+        </tr>
+      </tbody>
+    </table>
+    <p class="fineprint">Installation and repair work is billed outside the invoice series, so it is
+      shown here on its own rather than folded into the figures above. It is a supply of services
+      under its SAC code, not of goods under an HSN — your accountant reports it separately too.
+      Cancelled jobs are excluded. <a href="/services">Open the job list</a>.</p>
+  </section>
+</div>
+
+<div class="card flush">
+  <div class="cardhead" style="padding: var(--gap) var(--gap) 0">
+    <h2>Invoice-wise register</h2>
+    <span class="fineprint">In numbering order</span>
+  </div>
+  <div class="tablewrap">
+  <table class="table compact">
+    <thead>
+      <tr>
+        <th>Date</th><th>Invoice no</th><th>Buyer</th><th>Buyer GSTIN</th><th>Place of supply</th>
+        <th class="num">Taxable</th><th class="num">CGST</th><th class="num">SGST</th>
+        <th class="num">IGST</th><th class="num">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sales %}
+      <tr class="{{ 'row-void' if s.is_void else '' }}">
+        <td>{{ s.invoice_date|date }}</td>
+        <td>
+          <a href="/sales/{{ s.id }}" class="mono">{{ s.invoice_number }}</a>
+          {% if s.is_void %}<span class="pill pill-danger">cancelled</span>{% endif %}
+        </td>
+        <td>{{ s.customer_name }}</td>
+        <td class="mono">{{ s.customer_gstin or 'B2C' }}</td>
+        <td>{{ s.customer_state_code|state }}</td>
+        <td class="num">{{ s.taxable_paise|money }}</td>
+        <td class="num">{{ s.cgst_paise|money }}</td>
+        <td class="num">{{ s.sgst_paise|money }}</td>
+        <td class="num">{{ s.igst_paise|money }}</td>
+        <td class="num"><strong>{{ s.total_paise|money }}</strong></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="10" class="empty">No invoices between these dates.</td></tr>
+      {% endfor %}
+    </tbody>
+    {% if sales %}
+    <tfoot>
+      <tr>
+        <th colspan="5">{{ totals.count }} live invoice{{ '' if totals.count == 1 else 's' }}</th>
+        <th class="num">{{ totals.taxable|money }}</th>
+        <th class="num">{{ totals.cgst|money }}</th>
+        <th class="num">{{ totals.sgst|money }}</th>
+        <th class="num">{{ totals.igst|money }}</th>
+        <th class="num">{{ totals.total|money }}</th>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+  </div>
+</div>
+
+<p class="fineprint">Reverse charge does not apply to anything this shop issues, so no invoice here
+  is marked for it. Amounts are in rupees. The CSV export carries the same rows, one line per
+  invoice, ready for a spreadsheet.</p>
+
+{% endblock %}

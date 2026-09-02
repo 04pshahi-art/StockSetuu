@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Import products · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Import products from a file</h1>
+    <p class="sub">Bring the catalogue over from Tally, or from any spreadsheet you already keep.</p>
+  </div>
+  <a class="btn" href="/products">Back to products</a>
+</div>
+
+<div class="grid2">
+  <section class="card">
+    <h2>Upload</h2>
+    <form method="post" action="/import" enctype="multipart/form-data">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="formgrid">
+        <label class="span-all">File
+          <input type="file" name="upload_file" accept=".csv,.txt,.xlsx" required>
+          <span class="hint">CSV or .xlsx, up to 8 MB. Old .xls files are not read — save as CSV
+            or .xlsx first.</span>
+        </label>
+      </div>
+      <button class="btn btn-primary" type="submit">Read the file</button>
+      <p class="fineprint">Nothing is written to the catalogue yet. The next screens show which
+        columns were found, let you say what each one means, and then show exactly what would happen
+        to every row before anything is saved.</p>
+    </form>
+  </section>
+
+  <section class="card callout">
+    <h2>Getting the file out of Tally</h2>
+    <p class="fineprint" style="margin-top: 0">
+      <strong>This app does not assume any particular Tally layout.</strong> Export whatever your
+      Tally actually produces — the columns it contains are read from the file itself and shown back
+      to you to map. Different Tally versions and different companies name these columns
+      differently, and guessing would quietly corrupt your catalogue.
+    </p>
+    <ol class="prose">
+      <li>In Tally: <span class="mono">Gateway of Tally → Display More Reports → Inventory Books →
+        Stock Summary</span>.</li>
+      <li>Press <span class="mono">Alt + F12</span> (Configure) and turn on the columns you want to
+        carry over — typically quantity, rate and value. If you keep HSN and GST rate on the stock
+        item, include those too.</li>
+      <li>Press <span class="mono">Alt + E</span> (Export), choose <strong>CSV</strong> (or Excel
+        / .xlsx), and note where it saves the file.</li>
+      <li>Copy that file to wherever you are using this app, and upload it above.</li>
+    </ol>
+    <p class="fineprint">Anything Tally cannot give you — sale price, low-stock level, warranty
+      months — can be left unmapped and filled in later on the product screens. It is fine to import
+      the same file twice; the second run updates instead of duplicating, matched on SKU.</p>
+  </section>
+</div>
+
+<section class="card">
+  <h2>What the import will and will not do</h2>
+  <div class="grid2">
+    <ul class="prose">
+      <li><strong>Matches on SKU.</strong> A row whose SKU already exists updates that product.
+        A new SKU creates one. Nothing is ever duplicated.</li>
+      <li><strong>Only overwrites what you map.</strong> Columns you leave unmapped are not touched,
+        so an import that has no sale price will not wipe the prices you have already set.</li>
+      <li><strong>Opening stock goes through the ledger</strong>, exactly like a purchase, so every
+        unit on hand can still be explained later.</li>
+    </ul>
+    <ul class="prose">
+      <li><strong>It never deletes.</strong> A product missing from the file is left alone — this is
+        an import, not a sync.</li>
+      <li><strong>Serial numbers are not imported.</strong> They arrive with purchases, where they
+        can be tied to a bill, a date and a warranty.</li>
+      <li><strong>Nothing is written until you confirm the dry run</strong>, and if any row fails
+        mid-write the whole import is rolled back.</li>
+    </ul>
+  </div>
+</section>
+
+{% if recent %}
+<section class="card">
+  <h2>Previous imports</h2>
+  <table class="table compact">
+    <thead><tr><th>When</th><th>What happened</th></tr></thead>
+    <tbody>
+      {% for r in recent %}
+      <tr><td>{{ r.at|datetime }}</td><td>{{ r.detail }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="fineprint">Also in the <a href="/reports/audit">audit log</a>.</p>
+</section>
+{% endif %}
+
+{% endblock %}

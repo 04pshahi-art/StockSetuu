@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Sales {{ date_from }} to {{ date_to }} · {{ trade }}{% endblock %}
+{% block content %}
+
+{% set qs = '?from=' ~ date_from ~ '&to=' ~ date_to %}
+
+<div class="pagehead">
+  <div>
+    <h1>Sales</h1>
+    <p class="sub">{{ date_from|date }} to {{ date_to|date }} ·
+      {{ totals.count }} invoice{{ '' if totals.count == 1 else 's' }}
+      {%- if totals.cancelled %} · {{ totals.cancelled }} cancelled, excluded from every total{% endif %}</p>
+  </div>
+  <div class="pageactions">
+    <a class="btn" href="/reports/sales{{ qs }}&format=csv">Export CSV</a>
+    <a class="btn" href="/reports/gst/sales{{ qs }}">GST register</a>
+    <button class="btn" type="button" data-print>Print</button>
+  </div>
+</div>
+
+<form class="filters noprint" method="get" action="/reports/sales">
+  <label>From <input type="date" name="from" value="{{ date_from }}"></label>
+  <label>To <input type="date" name="to" value="{{ date_to }}"></label>
+  <button class="btn btn-primary" type="submit">Apply</button>
+  <a class="btn btn-quiet" href="/reports/sales">This month</a>
+</form>
+
+<div class="tiles tiles-3">
+  <div class="tile">
+    <span class="tile-label">Taxable value</span>
+    <span class="tile-value">{{ totals.taxable|money(symbol=True) }}</span>
+    <span class="tile-foot">Revenue before GST — this is the sales figure</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">GST collected</span>
+    <span class="tile-value">{{ totals.tax|money(symbol=True) }}</span>
+    <span class="tile-foot">Held for the government, not income</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Collected from customers</span>
+    <span class="tile-value">{{ totals.total|money(symbol=True) }}</span>
+    <span class="tile-foot">Invoice totals including GST</span>
+  </div>
+</div>
+
+<div class="grid2">
+  <section class="card">
+    <h2>By payment mode</h2>
+    <table class="table compact">
+      <thead><tr><th>Mode</th><th class="num">Invoices</th><th class="num">Collected</th></tr></thead>
+      <tbody>
+        {% for m in by_mode %}
+        <tr>
+          <td>{{ m.payment_mode|capitalize }}</td>
+          <td class="num">{{ m.n }}</td>
+          <td class="num">{{ m.total|money }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="empty">No sales in this range.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="fineprint">Useful for tallying the cash box and the UPI statement at closing time.</p>
+  </section>
+
+  <section class="card">
+    <h2>Best sellers</h2>
+    <table class="table compact">
+      <thead><tr><th>Item</th><th class="num">Qty sold</th><th class="num">Taxable value</th></tr></thead>
+      <tbody>
+        {% for t in top_products %}
+        <tr>
+          <td>{{ t.name }}<small>{{ t.sku }}</small></td>
+          <td class="num">{{ t.qty }}</td>
+          <td class="num">{{ t.taxable|money }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="3" class="empty">Nothing sold in this range.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="fineprint">Ranked by value, not by count — top fifteen.</p>
+  </section>
+</div>
+
+<div class="card flush">
+  <div class="cardhead" style="padding: var(--gap) var(--gap) 0"><h2>Every invoice</h2></div>
+  <div class="tablewrap">
+  <table class="table stack compact">
+    <thead>
+      <tr>
+        <th>Date</th><th>Invoice</th><th>Customer</th><th>Paid by</th>
+        <th class="num">Items</th><th class="num">Taxable</th><th class="num">GST</th><th class="num">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sales %}
+      <tr class="{{ 'row-void' if s.is_void else '' }}">
+        <td>{{ s.invoice_date|date }}</td>
+        <td>
+          <a href="/sales/{{ s.id }}" class="mono">{{ s.invoice_number }}</a>
+          {% if s.is_void %}<span class="pill pill-danger">cancelled</span>{% endif %}
+          {% if s.interstate %}<span class="pill pill-info">IGST</span>{% endif %}
+        </td>
+        <td>{{ s.customer_name }}<small>{{ s.customer_phone or '—' }}</small></td>
+        <td>{{ s.payment_mode }}</td>
+        <td class="num">{{ s.item_count }}</td>
+        <td class="num">{{ s.taxable_paise|money }}</td>
+        <td class="num">{{ (s.cgst_paise + s.sgst_paise + s.igst_paise)|money }}</td>
+        <td class="num"><strong>{{ s.total_paise|money }}</strong></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="empty">No invoices between these dates.</td></tr>
+      {% endfor %}
+    </tbody>
+    {% if sales %}
+    <tfoot>
+      <tr>
+        <th colspan="5">{{ totals.count }} live invoice{{ '' if totals.count == 1 else 's' }}</th>
+        <th class="num">{{ totals.taxable|money }}</th>
+        <th class="num">{{ totals.tax|money }}</th>
+        <th class="num">{{ totals.total|money }}</th>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+  </div>
+</div>
+
+<p class="fineprint">Cancelled invoices are listed but contribute nothing to the totals. They keep
+  their number on purpose — the series has to run without gaps.</p>
+
+{% endblock %}

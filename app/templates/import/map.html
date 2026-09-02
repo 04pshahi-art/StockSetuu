@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block title %}Map columns · {{ trade }}{% endblock %}
+{% block content %}
+
+{% set mapped = job.mapping %}
+
+<div class="pagehead">
+  <div>
+    <h1>What do these columns mean?</h1>
+    <p class="sub"><span class="mono">{{ job.filename }}</span> ·
+      {{ headers|length }} column{{ '' if headers|length == 1 else 's' }} ·
+      {{ row_count }} data row{{ '' if row_count == 1 else 's' }}</p>
+  </div>
+  <a class="btn" href="/import">Start again with another file</a>
+</div>
+
+<section class="card">
+  <div class="cardhead">
+    <h2>The file as it was read</h2>
+    <span class="fineprint">First {{ raw_preview|length }} lines, exactly as they appear</span>
+  </div>
+  <div class="tablewrap">
+  <table class="table compact">
+    <tbody>
+      {% for row in raw_preview %}
+      <tr class="{{ 'row-warn' if loop.index0 == job.header_index else '' }}">
+        <td class="num muted">{{ loop.index }}</td>
+        {% for cell in row[:12] %}
+        <td>{{ cell }}</td>
+        {% endfor %}
+        {% if loop.index0 == job.header_index %}
+        <td><span class="pill pill-warn">header</span></td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <form method="post" action="/import/{{ token }}/header" class="filters" style="margin-bottom: 0">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <label>Header row
+      <select name="header_index">
+        {% for row in raw_preview %}
+        <option value="{{ loop.index0 }}" {{ 'selected' if loop.index0 == job.header_index else '' }}>
+          Line {{ loop.index }}{% if row|join(' ')|trim %} — {{ row|join(' | ')|truncate(60) }}{% endif %}
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+    <button class="btn" type="submit">Use this row as the header</button>
+  </form>
+  <p class="fineprint">Tally puts the shop name and the report title above the real header. The row
+    highlighted above is the one being treated as column names — if that looks wrong, pick the right
+    line and the mapping below is re-guessed.</p>
+</section>
+
+<form method="post" action="/import/{{ token }}/preview">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  <section class="card">
+    <h2>Column mapping</h2>
+    <p class="fineprint" style="margin-top: 0">The dropdowns start on a guess made from the column
+      names in your file. Check every one — a guess is only a guess. Leave anything you do not have
+      set to “not in this file”.</p>
+    <div class="tablewrap">
+    <table class="table compact">
+      <thead>
+        <tr><th>Product field</th><th>Column in your file</th><th>First value in that column</th></tr>
+      </thead>
+      <tbody>
+        {% for f in fields %}
+        {% set chosen = mapped.get(f.key) %}
+        <tr>
+          <th>
+            {{ f.label }}
+            {% if f.required %}<span class="pill pill-danger">required</span>{% endif %}
+            {% if f.hint %}<small>{{ f.hint }}</small>{% endif %}
+          </th>
+          <td>
+            <select name="map__{{ f.key }}">
+              <option value="">— not in this file —</option>
+              {% for h in headers %}
+              <option value="{{ loop.index0 }}" {{ 'selected' if chosen is not none and chosen == loop.index0 else '' }}>
+                {{ h }}
+              </option>
+              {% endfor %}
+            </select>
+          </td>
+          <td class="muted">
+            {% if chosen is not none and sample and chosen < sample[0]|length %}
+            {{ sample[0][chosen] or '(blank)' }}
+            {% else %}
+            —
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="fineprint">Two fields cannot share one column — the dry run will say so rather than
+      guessing which you meant.</p>
+  </section>
+
+  <section class="card">
+    <h2>Fill the gaps</h2>
+    <p class="fineprint" style="margin-top: 0">Used only where the file has nothing to offer.</p>
+    <div class="formgrid">
+      <label>Category for rows with none
+        <select name="default_category">
+          {% for c in categories %}
+          <option value="{{ c }}">{{ c }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>GST rate for rows with none
+        <select name="default_gst_rate">
+          {% for bp in GST_SLABS_BP %}
+          <option value="{{ bp / 100 }}" {{ 'selected' if bp == default_gst_rate_bp else '' }}>
+            {{ SLAB_LABELS[bp] }}
+          </option>
+          {% endfor %}
+        </select>
+        <span class="hint">Computer parts and CCTV equipment are usually 18%. Fix the exceptions on
+          the product screen afterwards.</span>
+      </label>
+      <label>Low-stock level for rows with none
+        <input name="default_low_stock" type="number" min="0" step="1" value="{{ default_low_stock }}">
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Products already in the catalogue</h2>
+    <div class="formgrid">
+      <label>When the SKU already exists
+        <select name="on_existing">
+          <option value="update">Update it from this file</option>
+          <option value="skip">Leave it exactly as it is</option>
+        </select>
+        <span class="hint">Only the columns you mapped above are overwritten. Everything else is
+          left alone.</span>
+      </label>
+      <label>Quantities in this file
+        <select name="quantity_mode">
+          <option value="new_only">Use them as opening stock for new products only</option>
+          <option value="ignore">Ignore them completely</option>
+          <option value="set">Treat the file as a stock take and correct every quantity</option>
+        </select>
+      </label>
+    </div>
+    <p class="fineprint">
+      <strong>Opening stock for new products only</strong> is the safe choice, and the right one for
+      a first import from Tally. <strong>Stock take</strong> overwrites the on-hand quantity of
+      products you already have — every change is written to the stock ledger with this file's name
+      against it, so it stays explainable, but it will contradict any purchase or sale you have
+      entered since the file was exported. Do it at closing time, not mid-day.
+    </p>
+  </section>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" type="submit">Dry run — show me what would happen</button>
+    <a class="btn btn-quiet" href="/products">Cancel</a>
+  </div>
+  <p class="fineprint">Still nothing written. The next screen lists every row and what it would do.</p>
+</form>
+
+{% endblock %}

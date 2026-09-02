@@ -1,0 +1,204 @@
+{% extends "base.html" %}
+{% block title %}Shop settings · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Shop settings</h1>
+    <p class="sub">These details print on every invoice. Nothing here is hardcoded in the app —
+      change it and the next invoice picks it up.</p>
+  </div>
+  <a class="btn" href="/account">Your login</a>
+</div>
+
+<form method="post" action="/settings">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  <section class="card">
+    <h2>Business identity</h2>
+    <div class="formgrid">
+      <label class="span2">Legal name *
+        <input name="legal_name" value="{{ shop.legal_name }}" required>
+        <span class="hint">The registered person's name as it appears on the GST certificate.</span>
+      </label>
+      <label class="span2">Trade name
+        <input name="trade_name" value="{{ shop.trade_name }}">
+        <span class="hint">The shop name customers know. Shown as the heading on invoices.</span>
+      </label>
+      <label>GSTIN
+        <input name="gstin" value="{{ shop.gstin }}" maxlength="15"
+               spellcheck="false" style="text-transform: uppercase">
+        <span class="hint">Validated including the check digit. Its first two digits must match
+          the state below.</span>
+      </label>
+      <label>Registration type
+        <select name="registration_type">
+          {% for kind in ('Regular', 'Composition', 'Unregistered') %}
+          <option value="{{ kind }}" {{ 'selected' if shop.registration_type == kind else '' }}>{{ kind }}</option>
+          {% endfor %}
+        </select>
+        <span class="hint">Regular means you charge and show CGST/SGST/IGST on invoices,
+          which is what this app does.</span>
+      </label>
+      <label>Home state *
+        <select name="state_code">
+          {% for code, name in STATES %}
+          <option value="{{ code }}" {{ 'selected' if shop.state_code == code else '' }}>{{ code }} — {{ name }}</option>
+          {% endfor %}
+        </select>
+        <span class="hint">The reference for intra-state versus inter-state. Same state as the
+          customer → CGST + SGST. Different state → IGST.</span>
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Address &amp; contact (as per the GST certificate)</h2>
+    <div class="formgrid">
+      <label class="span2">Address line 1
+        <input name="address_line1" value="{{ shop.address_line1 }}">
+      </label>
+      <label class="span2">Address line 2
+        <input name="address_line2" value="{{ shop.address_line2 }}">
+      </label>
+      <label>City / town
+        <input name="city" value="{{ shop.city }}">
+      </label>
+      <label>PIN code
+        <input name="pincode" value="{{ shop.pincode }}" inputmode="numeric" maxlength="6">
+      </label>
+      <label>Phone
+        <input name="phone" value="{{ shop.phone }}" inputmode="tel">
+      </label>
+      <label>Email
+        <input name="email" value="{{ shop.email }}" type="email">
+      </label>
+      <label class="span-all">Bank details (printed on invoices)
+        <textarea name="bank_details" rows="2"
+          placeholder="Bank, branch, account number, IFSC, UPI id">{{ shop.bank_details }}</textarea>
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Invoicing</h2>
+    <div class="formgrid">
+      <label>Invoice prefix
+        <input name="invoice_prefix" value="{{ shop.invoice_prefix }}" maxlength="12">
+        <span class="hint">Numbers come out as
+          <span class="mono">{{ shop.invoice_prefix }}/&lt;financial year&gt;/0001</span> — the
+          financial year runs April to March, so an invoice dated March 2026 falls in 2025-26.
+          The prefix cannot be changed once invoices exist, because that would break the
+          continuity of the series.</span>
+      </label>
+      <label>Default GST rate for new products
+        <select name="default_gst_rate">
+          {% for bp in GST_SLABS_BP %}
+          <option value="{{ bp / 100 }}" {{ 'selected' if bp == shop.default_gst_rate_bp else '' }}>
+            {{ SLAB_LABELS[bp] }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Default low-stock level
+        <input name="default_low_stock" type="number" min="0" step="1" value="{{ shop.default_low_stock }}">
+      </label>
+      <label>Default SAC for service jobs
+        <input name="default_service_sac" value="{{ shop.default_service_sac }}" maxlength="8">
+      </label>
+      <label>Warranty counts from
+        <select name="warranty_basis">
+          <option value="sale" {{ 'selected' if shop.warranty_basis == 'sale' else '' }}>Date of sale</option>
+          <option value="purchase" {{ 'selected' if shop.warranty_basis == 'purchase' else '' }}>Date of purchase</option>
+        </select>
+        <span class="hint">Most brands count from the customer's invoice date, which is the
+          default. Some count from when the shop bought the unit.</span>
+      </label>
+      <label class="span-all">Terms printed on the invoice
+        <textarea name="invoice_terms" rows="3"
+          placeholder="Goods once sold are not returnable. Warranty as per brand terms.">{{ shop.invoice_terms }}</textarea>
+      </label>
+      <label class="span2 check">
+        <input type="checkbox" name="default_prices_include_gst" value="1"
+               {{ 'checked' if shop.default_prices_include_gst else '' }}>
+        Sale prices in the catalogue already include GST
+      </label>
+      <label class="span2 check">
+        <input type="checkbox" name="round_invoice_to_rupee" value="1"
+               {{ 'checked' if shop.round_invoice_to_rupee else '' }}>
+        Round invoice totals to the nearest rupee (shown as a round-off line)
+      </label>
+    </div>
+  </section>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" type="submit">Save shop details</button>
+  </div>
+</form>
+
+<div class="grid2">
+  <section class="card">
+    <h2>Product categories</h2>
+    <ul class="pill-list">
+      {% for c in categories %}
+      <li><span class="pill">{{ c }}</span></li>
+      {% endfor %}
+    </ul>
+    <form method="post" action="/settings/categories" class="filters" style="margin: 0">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label class="grow">New category
+        <input name="name" placeholder="Networking, Accessories, Cabling…">
+      </label>
+      <button class="btn btn-primary" type="submit">Add</button>
+    </form>
+    <p class="fineprint">Categories are never deleted from here — a product already filed under
+      one would lose its label.</p>
+  </section>
+
+  <section class="card">
+    <h2>Numbering series</h2>
+    <table class="table compact">
+      <thead><tr><th>Series</th><th class="num">Last issued</th></tr></thead>
+      <tbody>
+        {% for c in counters %}
+        <tr><td class="mono">{{ c.name }}</td><td class="num">{{ c.value }}</td></tr>
+        {% else %}
+        <tr><td colspan="2" class="empty">Nothing issued yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="fineprint">One counter per financial year. Numbers are handed out inside the same
+      database transaction that saves the invoice, so the series cannot skip a number even if
+      two screens save at the same moment. These are deliberately not editable.</p>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Storage &amp; safety</h2>
+  <dl class="kv">
+    <dt>Database file</dt><dd class="mono">{{ db_path }}</dd>
+    <dt>Encryption</dt>
+    <dd>
+      {% if db_status.encrypted %}
+      <span class="pill pill-ok">encrypted at rest</span> {{ db_status.driver }}
+      {% else %}
+      <span class="pill pill-danger">not encrypted</span> {{ db_status.detail }}
+      {% endif %}
+    </dd>
+    <dt>Backup folder</dt><dd class="mono">{{ backup_dir }}</dd>
+    <dt>Auto sign-out</dt><dd>After {{ idle_minutes }} minutes of inactivity</dd>
+    <dt>Health check</dt><dd><a class="mono" href="/healthz">/healthz</a></dd>
+  </dl>
+  {% if not db_status.encrypted %}
+  <p class="fineprint">
+    The database is readable by anyone who copies the file. Install SQLCipher on the server
+    (<span class="mono">pip install sqlcipher3-wheels</span>), set <span class="mono">DB_KEY</span>,
+    and restart. See the README for the exact steps.
+  </p>
+  {% endif %}
+  <p class="fineprint">Back up with <span class="mono">python manage.py backup</span> — it copies
+    the encrypted file, so the copy needs the same key to open. Schedule it in Windows Task
+    Scheduler and keep at least one copy off the server.</p>
+</section>
+
+{% endblock %}

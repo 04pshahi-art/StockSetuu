@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <h1>Dashboard</h1>
+  <div class="pageactions">
+    <a class="btn btn-primary" href="/sales/new">New sale</a>
+    <a class="btn" href="/purchases/new">New purchase</a>
+    <a class="btn" href="/services/new">New service job</a>
+  </div>
+</div>
+
+<div class="tiles">
+  <div class="tile">
+    <span class="tile-label">Sales today</span>
+    <span class="tile-value">{{ today_sales.total|money(symbol=True) }}</span>
+    <span class="tile-foot">{{ today_sales.invoices }} invoice(s)</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Sales this month</span>
+    <span class="tile-value">{{ month_sales.total|money(symbol=True) }}</span>
+    <span class="tile-foot">
+      {{ month_sales.invoices }} invoices · GST {{ month_sales.tax|money(symbol=True) }}
+    </span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Purchases this month</span>
+    <span class="tile-value">{{ month_purchases.total|money(symbol=True) }}</span>
+    <span class="tile-foot">{{ month_purchases.bills }} bill(s)</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Stock value (at cost)</span>
+    <span class="tile-value">{{ stock.cost_value|money(symbol=True) }}</span>
+    <span class="tile-foot">{{ stock.products }} products · {{ stock.units }} units</span>
+  </div>
+  <div class="tile {{ 'tile-warn' if stock.low else '' }}">
+    <span class="tile-label">Low / out of stock</span>
+    <span class="tile-value">{{ stock.low }}</span>
+    <span class="tile-foot">{{ stock.out }} at zero</span>
+  </div>
+  <div class="tile {{ 'tile-warn' if counts.jobs_pending else '' }}">
+    <span class="tile-label">Pending service jobs</span>
+    <span class="tile-value">{{ counts.jobs_pending }}</span>
+    <span class="tile-foot">{{ counts.serials_in_stock }} serials in stock</span>
+  </div>
+</div>
+
+<div class="grid2">
+  <section class="card">
+    <div class="cardhead">
+      <h2>Needs reordering</h2>
+      <a href="/products?stock=low">All low stock</a>
+    </div>
+    {% if low_stock %}
+    <table class="table compact">
+      <thead><tr><th>Product</th><th class="num">On hand</th><th class="num">Alert at</th></tr></thead>
+      <tbody>
+        {% for p in low_stock %}
+        <tr class="{{ 'row-danger' if p.quantity <= 0 else 'row-warn' }}">
+          <td><a href="/products/{{ p.id }}">{{ p.name }}</a><small>{{ p.sku }}</small></td>
+          <td class="num">{{ p.quantity }}</td>
+          <td class="num">{{ p.low_stock_threshold }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">Everything is above its alert level.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="cardhead">
+      <h2>Recent invoices</h2>
+      <a href="/sales">All sales</a>
+    </div>
+    {% if recent_sales %}
+    <table class="table compact">
+      <thead><tr><th>Invoice</th><th>Customer</th><th class="num">Total</th></tr></thead>
+      <tbody>
+        {% for s in recent_sales %}
+        <tr class="{{ 'row-void' if s.is_void else '' }}">
+          <td><a href="/sales/{{ s.id }}">{{ s.invoice_number }}</a><small>{{ s.invoice_date|date }}</small></td>
+          <td>{{ s.customer_name or 'Walk-in' }}{% if s.is_void %} <span class="pill pill-danger">Cancelled</span>{% endif %}</td>
+          <td class="num">{{ s.total_paise|money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No invoices yet. <a href="/sales/new">Create the first one</a>.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="cardhead">
+      <h2>Pending service jobs</h2>
+      <a href="/services?status=pending">All pending</a>
+    </div>
+    {% if pending_jobs %}
+    <table class="table compact">
+      <thead><tr><th>Job</th><th>Customer</th><th class="num">Amount</th></tr></thead>
+      <tbody>
+        {% for j in pending_jobs %}
+        <tr>
+          <td><a href="/services/{{ j.id }}">{{ j.job_number }}</a><small>{{ j.job_date|date }}</small></td>
+          <td>{{ j.customer_name }}<small>{{ j.description|truncate(48) }}</small></td>
+          <td class="num">{{ j.total_paise|money }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">No jobs pending.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <div class="cardhead">
+      <h2>Warranties expiring in 30 days</h2>
+      <a href="/serials?expiry=soon">All</a>
+    </div>
+    {% if expiring %}
+    <table class="table compact">
+      <thead><tr><th>Serial</th><th>Customer</th><th>Expires</th></tr></thead>
+      <tbody>
+        {% for s in expiring %}
+        <tr>
+          <td><a href="/serials/{{ s.id }}">{{ s.serial_no }}</a><small>{{ s.product_name }}</small></td>
+          <td>{{ s.customer_name or '—' }}<small>{{ s.customer_phone or '' }}</small></td>
+          <td>{{ s.warranty_expiry|date }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <p class="empty">Nothing expiring in the next 30 days.</p>
+    {% endif %}
+  </section>
+</div>
+
+{% if not shop.gstin or not shop.legal_name %}
+<div class="card callout">
+  <h2>Finish setting up</h2>
+  <p>Your invoices need the shop's legal name, GSTIN and address before they are valid tax invoices.</p>
+  <a class="btn btn-primary" href="/settings">Open shop settings</a>
+</div>
+{% endif %}
+
+{% endblock %}

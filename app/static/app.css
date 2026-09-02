@@ -1,0 +1,445 @@
+/* Pratyush Computer Services — single stylesheet.
+   Built for two screens: a shop counter monitor and the owner's phone over Tailscale.
+   Section 9 at the bottom is the A4 invoice print sheet. */
+
+/* 1. tokens ------------------------------------------------------------- */
+:root {
+  --bg: #f4f6f9;
+  --panel: #ffffff;
+  --ink: #16202c;
+  --ink-soft: #5b6b7c;
+  --line: #dde3ea;
+  --brand: #14497d;
+  --brand-ink: #ffffff;
+  --accent: #0a7d5a;
+  --danger: #b3261e;
+  --warn: #9a6100;
+  --warn-bg: #fff6e0;
+  --ok-bg: #e6f6ee;
+  --err-bg: #fdeceb;
+  --radius: 10px;
+  --gap: 16px;
+  --shadow: 0 1px 2px rgba(16, 32, 48, .07), 0 4px 14px rgba(16, 32, 48, .05);
+  --mono: ui-monospace, "Cascadia Mono", Consolas, "Liberation Mono", monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+  --topbar-h: 56px;
+  --sidebar-w: 224px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0f1620;
+    --panel: #17212e;
+    --ink: #e7edf4;
+    --ink-soft: #9fb0c2;
+    --line: #26333f;
+    --brand: #2f6fb5;
+    --accent: #35b98a;
+    --danger: #ff8a80;
+    --warn: #ffc46b;
+    --warn-bg: #33280f;
+    --ok-bg: #102e24;
+    --err-bg: #33191a;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .4);
+  }
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font: 15px/1.5 var(--sans);
+}
+
+a { color: var(--brand); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+h1 { font-size: 1.5rem; margin: 0 0 .2em; }
+h2 { font-size: 1.1rem; margin: 0 0 .4em; }
+h3 { font-size: 1rem; margin: 1.2em 0 .4em; }
+
+code, .mono, kbd { font-family: var(--mono); font-size: .92em; }
+kbd {
+  border: 1px solid var(--line); border-bottom-width: 2px;
+  border-radius: 4px; padding: 0 .35em; background: var(--panel);
+}
+
+.skip { position: absolute; left: -9999px; }
+.skip:focus { left: 8px; top: 8px; background: var(--panel); padding: 8px; z-index: 50; }
+
+/* 2. chrome ------------------------------------------------------------- */
+.topbar {
+  position: sticky; top: 0; z-index: 30;
+  height: var(--topbar-h);
+  display: flex; align-items: center; gap: 12px;
+  padding: 0 14px;
+  background: var(--brand); color: var(--brand-ink);
+  box-shadow: var(--shadow);
+}
+.topbar a { color: var(--brand-ink); }
+.brand { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+.brand strong { font-size: .98rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.brand span { font-size: .72rem; opacity: .8; font-family: var(--mono); }
+.menu-toggle {
+  display: none; background: none; border: 0; color: inherit;
+  font-size: 1.35rem; cursor: pointer; padding: 4px 6px;
+}
+.topsearch { margin-left: auto; }
+.topsearch input {
+  width: 240px; padding: 7px 10px; border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, .35);
+  background: rgba(255, 255, 255, .14); color: inherit;
+}
+.topsearch input::placeholder { color: rgba(255, 255, 255, .7); }
+.topactions { display: flex; align-items: center; gap: 8px; }
+.inline { display: inline; }
+
+.shell { display: flex; align-items: flex-start; min-height: calc(100vh - var(--topbar-h)); }
+
+.sidebar {
+  width: var(--sidebar-w); flex: 0 0 var(--sidebar-w);
+  position: sticky; top: var(--topbar-h);
+  max-height: calc(100vh - var(--topbar-h)); overflow-y: auto;
+  padding: 12px 10px; background: var(--panel);
+  border-right: 1px solid var(--line);
+}
+.sidebar ul { list-style: none; margin: 0; padding: 0; }
+.sidebar a {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 10px; border-radius: 8px;
+  color: var(--ink); font-size: .93rem;
+}
+.sidebar a i { width: 18px; text-align: center; font-style: normal; opacity: .7; }
+.sidebar a:hover { background: var(--bg); text-decoration: none; }
+.sidebar a.active { background: var(--brand); color: var(--brand-ink); font-weight: 600; }
+.sidebar a.active i { opacity: 1; }
+.sidebar-warn {
+  margin: 14px 6px 0; padding: 8px; border-radius: 8px;
+  background: var(--warn-bg); color: var(--warn); font-size: .8rem;
+}
+
+.content { flex: 1 1 auto; min-width: 0; padding: var(--gap); padding-bottom: 84px; }
+
+.bottomnav { display: none; }
+
+/* 3. layout blocks ------------------------------------------------------ */
+.pagehead {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+  justify-content: space-between; margin-bottom: var(--gap);
+}
+.pagehead .sub { margin: 0; color: var(--ink-soft); font-size: .9rem; }
+.pageactions { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.card {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); box-shadow: var(--shadow);
+  padding: 16px; margin-bottom: var(--gap);
+}
+.card.narrow { max-width: 640px; }
+.card.flush { padding: 0; overflow: hidden; }
+.card.flush .cardhead { padding: 14px 16px 0; }
+.card.flush .table { margin: 0; }
+.cardhead {
+  display: flex; align-items: baseline; justify-content: space-between;
+  gap: 10px; margin-bottom: 10px;
+}
+.cardhead h2 { margin: 0; }
+.cardhead a { font-size: .85rem; }
+.callout { border-left: 4px solid var(--brand); }
+
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: var(--gap); }
+.grid2 > .card { margin-bottom: 0; }
+.grid3 { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: var(--gap); }
+.grid3 > .card { margin-bottom: 0; }
+
+.tiles {
+  display: grid; gap: 12px; margin-bottom: var(--gap);
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+}
+.tiles-3 { grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
+.tiles-4 { grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); }
+.tile {
+  background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 12px 14px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 2px;
+}
+.tile-label { font-size: .78rem; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); }
+.tile-value { font-size: 1.5rem; font-weight: 650; font-variant-numeric: tabular-nums; }
+.tile-foot { font-size: .8rem; color: var(--ink-soft); }
+.tile-warn { border-color: var(--warn); background: var(--warn-bg); }
+.tile-warn .tile-value, .tile-warn .tile-label, .tile-warn .tile-foot { color: var(--warn); }
+
+.empty { color: var(--ink-soft); font-style: italic; margin: 8px 0; }
+.fineprint { font-size: .8rem; color: var(--ink-soft); }
+.muted { color: var(--ink-soft); }
+
+.prose { margin: 0; padding-left: 20px; font-size: .9rem; }
+.prose li { margin-bottom: 7px; }
+.prose li:last-child { margin-bottom: 0; }
+.pill-list { list-style: none; display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; padding: 0; }
+
+/* 4. flash + pills ------------------------------------------------------ */
+.flash {
+  padding: 10px 14px; border-radius: 8px; margin-bottom: var(--gap);
+  border: 1px solid transparent; font-size: .93rem;
+}
+.flash.ok { background: var(--ok-bg); border-color: var(--accent); color: var(--accent); }
+.flash.err { background: var(--err-bg); border-color: var(--danger); color: var(--danger); }
+.flash.warn { background: var(--warn-bg); border-color: var(--warn); color: var(--warn); }
+
+.pill {
+  display: inline-block; padding: 1px 8px; border-radius: 999px;
+  font-size: .74rem; font-weight: 600; white-space: nowrap;
+  background: var(--bg); border: 1px solid var(--line); color: var(--ink-soft);
+}
+.pill-ok { background: var(--ok-bg); border-color: var(--accent); color: var(--accent); }
+.pill-warn { background: var(--warn-bg); border-color: var(--warn); color: var(--warn); }
+.pill-danger { background: var(--err-bg); border-color: var(--danger); color: var(--danger); }
+.pill-info { background: var(--bg); border-color: var(--brand); color: var(--brand); }
+
+/* 5. buttons ------------------------------------------------------------ */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 14px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink);
+  font: inherit; font-size: .9rem; font-weight: 500;
+  cursor: pointer; text-decoration: none; white-space: nowrap;
+}
+.btn:hover { text-decoration: none; filter: brightness(.97); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.btn-primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.btn-accent { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-danger { background: var(--panel); border-color: var(--danger); color: var(--danger); }
+.btn-quiet { background: transparent; border-color: transparent; }
+.topbar .btn-quiet { color: var(--brand-ink); opacity: .85; }
+.btn-sm { padding: 4px 9px; font-size: .82rem; }
+.btn-block { width: 100%; justify-content: center; }
+.btn-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+
+/* 6. forms -------------------------------------------------------------- */
+label { display: block; margin-bottom: 12px; font-size: .85rem; color: var(--ink-soft); }
+label > input, label > select, label > textarea { margin-top: 4px; }
+input, select, textarea {
+  width: 100%; padding: 9px 10px; font: inherit; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+}
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--brand); outline-offset: -1px; border-color: var(--brand);
+}
+input[type="checkbox"], input[type="radio"] { width: auto; margin-right: 6px; }
+textarea { min-height: 76px; resize: vertical; }
+input[readonly], input:disabled, select:disabled { background: var(--bg); color: var(--ink-soft); }
+.hint { display: block; font-size: .78rem; color: var(--ink-soft); margin-top: 3px; }
+.check { display: flex; align-items: flex-start; gap: 8px; color: var(--ink); }
+.check input { margin-top: 3px; }
+
+.formgrid { display: grid; gap: 0 14px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+.formgrid .span2 { grid-column: span 2; }
+.formgrid .span-all { grid-column: 1 / -1; }
+fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; margin: 0 0 var(--gap); }
+legend { padding: 0 6px; font-size: .85rem; font-weight: 600; color: var(--ink-soft); }
+
+.filters {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;
+  margin-bottom: var(--gap); padding: 12px; background: var(--panel);
+  border: 1px solid var(--line); border-radius: var(--radius);
+}
+.filters label { margin: 0; }
+.filters input, .filters select { min-width: 130px; }
+.filters .grow { flex: 1 1 200px; }
+
+.scanbar {
+  display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+  padding: 12px; border-radius: var(--radius);
+  background: var(--ok-bg); border: 1px dashed var(--accent); margin-bottom: var(--gap);
+}
+.scanbar label { flex: 1 1 260px; margin: 0; color: var(--accent); font-weight: 600; }
+.scanbar input { border-color: var(--accent); font-family: var(--mono); font-size: 1.05rem; }
+.scanbar .scanhint { font-size: .78rem; color: var(--accent); }
+
+/* 7. tables ------------------------------------------------------------- */
+.tablewrap { overflow-x: auto; margin: 0 -16px; padding: 0 16px; }
+.table { width: 100%; border-collapse: collapse; font-size: .9rem; }
+.table th, .table td {
+  text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+.table thead th {
+  font-size: .74rem; text-transform: uppercase; letter-spacing: .04em;
+  color: var(--ink-soft); background: var(--bg); white-space: nowrap; position: sticky; top: 0;
+}
+.table tbody tr:hover { background: var(--bg); }
+.table td small { display: block; color: var(--ink-soft); font-size: .78rem; }
+.table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.table tfoot td { font-weight: 650; border-top: 2px solid var(--line); border-bottom: 0; }
+.table.compact th, .table.compact td { padding: 6px 8px; }
+.table .actions { white-space: nowrap; text-align: right; }
+.row-warn { background: var(--warn-bg); }
+.row-danger { background: var(--err-bg); }
+.row-void { opacity: .6; text-decoration: line-through; }
+.row-void a { text-decoration: line-through; }
+
+.pager { display: flex; gap: 8px; align-items: center; justify-content: center; margin-top: var(--gap); }
+.pager span { color: var(--ink-soft); font-size: .85rem; }
+
+.kv { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 4px 14px; font-size: .9rem; }
+.kv dt { color: var(--ink-soft); }
+.kv dd { margin: 0; }
+
+.totals { margin-left: auto; width: min(360px, 100%); font-size: .92rem; }
+.totals tr td { padding: 4px 0; }
+.totals tr td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.totals .grand td { font-size: 1.1rem; font-weight: 700; border-top: 2px solid var(--line); padding-top: 8px; }
+
+/* 8. line-item editor --------------------------------------------------- */
+.lines { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.lines th, .lines td { padding: 6px 6px; border-bottom: 1px solid var(--line); }
+.lines thead th { font-size: .72rem; text-transform: uppercase; color: var(--ink-soft); }
+.lines input, .lines select { padding: 6px 7px; }
+.lines .w-qty { width: 78px; }
+.lines .w-rate { width: 96px; }
+.lines .w-gst { width: 88px; }
+.lines .w-hsn { width: 92px; }
+.lines .cell-num input { text-align: right; font-variant-numeric: tabular-nums; }
+.lines .line-total { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.lines .serialbox { width: 100%; min-height: 34px; font-family: var(--mono); font-size: .82rem; }
+.lines tr.needs-serials { background: var(--warn-bg); }
+
+.loginpage {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 100vh; padding: 20px; background: var(--brand);
+}
+.loginbox {
+  width: 100%; max-width: 380px; background: var(--panel);
+  border-radius: 14px; padding: 26px; box-shadow: 0 18px 40px rgba(0, 0, 0, .25);
+}
+.loginbox h1 { font-size: 1.25rem; }
+.loginbox .sub { margin: 0 0 18px; font-size: .82rem; color: var(--ink-soft); }
+
+/* 9. invoice + print --------------------------------------------------- */
+.invoice {
+  background: #fff; color: #000; max-width: 210mm; margin: 0 auto;
+  padding: 12mm; border: 1px solid var(--line); border-radius: 6px;
+  font-size: 11.5px; line-height: 1.35;
+}
+.invoice a { color: #000; }
+.inv-head { display: flex; justify-content: space-between; gap: 16px; align-items: flex-start; }
+.inv-title { text-align: center; flex: 1 1 auto; }
+.inv-title h1 { font-size: 15px; letter-spacing: .12em; text-transform: uppercase; margin: 0; }
+.inv-title .copy { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.inv-seller strong { display: block; font-size: 14px; }
+.inv-seller { max-width: 58%; }
+.inv-meta { text-align: right; font-size: 11px; }
+.inv-parties { display: flex; gap: 10px; margin-top: 8px; }
+.inv-party { flex: 1 1 50%; border: 1px solid #000; padding: 6px 8px; }
+.inv-party h3 { margin: 0 0 3px; font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.inv-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+/* Twelve columns of GST figures have a minimum width that neither a phone nor a tablet
+   beside the sidebar can honour, so the item table slides sideways inside the sheet.
+   Without this it pushes the whole invoice off the right and the page scrolls when you
+   try to read it. At full width there is nothing to scroll and no scrollbar appears. */
+.inv-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.inv-table th, .inv-table td { border: 1px solid #000; padding: 3px 5px; }
+.inv-table thead th { font-size: 9.5px; text-transform: uppercase; background: #eee; text-align: center; }
+.inv-table td.num, .inv-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.inv-table td.ctr { text-align: center; }
+.inv-table tfoot td { font-weight: 700; }
+.inv-table .serials { display: block; font-size: 9.5px; font-family: var(--mono); }
+.inv-bottom { display: flex; gap: 10px; margin-top: 8px; align-items: stretch; }
+.inv-bottom > div { border: 1px solid #000; padding: 6px 8px; }
+.inv-left { flex: 1 1 58%; }
+.inv-right { flex: 1 1 42%; }
+.inv-right table { width: 100%; border-collapse: collapse; }
+.inv-right td { padding: 2px 0; }
+.inv-right td:last-child { text-align: right; font-variant-numeric: tabular-nums; }
+.inv-right .grand td { border-top: 1px solid #000; font-weight: 700; font-size: 12.5px; padding-top: 4px; }
+.inv-words { margin-top: 6px; border: 1px solid #000; padding: 5px 8px; font-size: 11px; }
+.inv-sign { display: flex; justify-content: space-between; margin-top: 14px; gap: 16px; }
+.inv-sign div { text-align: center; font-size: 10.5px; min-width: 42%; }
+.inv-sign .line { margin-top: 34px; border-top: 1px solid #000; padding-top: 3px; }
+.inv-foot { margin-top: 8px; font-size: 9.5px; text-align: center; }
+.inv-void {
+  position: relative; outline: 3px solid var(--danger);
+}
+.inv-void::after {
+  content: "CANCELLED"; position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 68px; font-weight: 800; color: rgba(179, 38, 30, .18);
+  transform: rotate(-24deg); pointer-events: none; letter-spacing: .1em;
+}
+
+@media print {
+  @page { size: A4; margin: 8mm; }
+  body { background: #fff; font-size: 11px; }
+  .noprint, .topbar, .sidebar, .bottomnav, .flash { display: none !important; }
+  .shell { display: block; }
+  .content { padding: 0; }
+  .card { border: 0; box-shadow: none; padding: 0; margin: 0; }
+  .invoice { border: 0; border-radius: 0; padding: 0; max-width: none; margin: 0; }
+  /* Printing from a phone can still match the narrow media query; paper has no scrollbars
+     and a clipped invoice would lose its right-hand columns. */
+  .inv-scroll { overflow: visible !important; }
+  .table thead th { position: static; background: #eee; }
+  a { text-decoration: none; }
+  .printonly { display: block !important; }
+}
+.printonly { display: none; }
+
+/* 10. responsive ------------------------------------------------------- */
+@media (max-width: 900px) {
+  .topsearch { display: none; }
+  .topactions .btn:not(.btn-primary) { display: none; }
+}
+
+@media (max-width: 760px) {
+  :root { --gap: 12px; }
+  .menu-toggle { display: block; }
+  .sidebar {
+    position: fixed; inset: var(--topbar-h) auto 0 0; z-index: 25;
+    max-height: none; height: calc(100vh - var(--topbar-h));
+    transform: translateX(-100%); transition: transform .18s ease;
+    box-shadow: var(--shadow);
+  }
+  .sidebar.open { transform: none; }
+  .content { padding-bottom: 76px; }
+  .bottomnav {
+    display: flex; position: fixed; bottom: 0; left: 0; right: 0; z-index: 28;
+    background: var(--panel); border-top: 1px solid var(--line);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .bottomnav a {
+    flex: 1; text-align: center; padding: 7px 2px 9px;
+    font-size: .68rem; color: var(--ink-soft);
+  }
+  .bottomnav a i { display: block; font-style: normal; font-size: 1.15rem; margin-bottom: 1px; }
+  .bottomnav a.active { color: var(--brand); font-weight: 600; }
+
+  /* Card-per-row tables: the header label is carried in data-label. */
+  .table.stack thead { display: none; }
+  .table.stack tr {
+    display: block; border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; margin-bottom: 8px; background: var(--panel);
+  }
+  .table.stack td { display: flex; justify-content: space-between; gap: 12px; border: 0; padding: 3px 0; }
+  .table.stack td::before {
+    content: attr(data-label); font-size: .75rem; text-transform: uppercase;
+    color: var(--ink-soft); flex: 0 0 auto;
+  }
+  .table.stack td.num { text-align: right; }
+  .table.stack td small { display: inline; }
+  .table.stack .actions { justify-content: flex-end; }
+  .tablewrap { margin: 0; padding: 0; }
+
+  .lines { font-size: .85rem; }
+  .lines .w-qty { width: 60px; }
+  .lines .w-rate, .lines .w-gst, .lines .w-hsn { width: 80px; }
+  .formgrid .span2 { grid-column: span 1; }
+  .totals { width: 100%; }
+  .invoice { padding: 6mm; font-size: 10.5px; }
+  .inv-head, .inv-parties, .inv-bottom { flex-direction: column; }
+  .inv-seller { max-width: none; }
+  .inv-meta { text-align: left; }
+}

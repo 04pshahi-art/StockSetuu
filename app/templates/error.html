@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Error {{ status_code }} · {{ trade }}{% endblock %}
+{% block content %}
+<div class="card narrow">
+  <h1>{{ status_code }}</h1>
+  <p>{{ message or 'Something went wrong.' }}</p>
+  <p><a class="btn btn-primary" href="/">Back to dashboard</a></p>
+</div>
+{% endblock %}

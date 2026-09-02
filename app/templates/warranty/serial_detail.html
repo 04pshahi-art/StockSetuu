@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}{{ serial.serial_no }} · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1 class="mono">{{ serial.serial_no }}</h1>
+    <p class="sub">
+      <a href="/products/{{ serial.product_id }}">{{ serial.product_name }}</a>
+      {% if serial.brand %} · {{ serial.brand }}{% endif %} · {{ serial.sku }}
+    </p>
+  </div>
+  <div class="pageactions">
+    <a class="btn" href="/serials">All serials</a>
+    <a class="btn" href="/warranty?q={{ serial.serial_no }}">Warranty lookup</a>
+  </div>
+</div>
+
+<div class="tiles tiles-3">
+  <div class="tile {{ 'tile-warn' if serial.warranty_state == 'expiring' else ('tile-danger' if serial.warranty_state == 'expired' else '') }}">
+    <span class="tile-label">Warranty</span>
+    <span class="tile-value">
+      {% if serial.warranty_state == 'active' %}In warranty
+      {% elif serial.warranty_state == 'expiring' %}Expiring soon
+      {% elif serial.warranty_state == 'expired' %}Expired
+      {% else %}Not recorded{% endif %}
+    </span>
+    <span class="tile-foot">
+      {% if serial.warranty_expiry %}Until {{ serial.warranty_expiry|date }}
+        {% if serial.days_remaining is not none %}
+          ({% if serial.days_remaining < 0 %}{{ -serial.days_remaining }} days ago
+           {%- else %}{{ serial.days_remaining }} days left{% endif %})
+        {% endif %}
+      {% else %}No expiry date on file{% endif %}
+    </span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Status</span>
+    <span class="tile-value">{{ serial.status.replace('_', ' ')|title }}</span>
+    <span class="tile-foot">{{ serial.warranty_months }} month cover
+      {%- if serial.product_warranty %} (product default {{ serial.product_warranty }}){% endif %}</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Registered</span>
+    <span class="tile-value">{{ serial.purchase_date|date if serial.purchase_date else '—' }}</span>
+    <span class="tile-foot">{{ serial.created_at|datetime }}</span>
+  </div>
+</div>
+
+<div class="grid2">
+  <section class="card">
+    <h2>Where it came from</h2>
+    {% if serial.purchase_id %}
+    <dl class="kv">
+      <dt>Dealer</dt><dd>{{ serial.dealer_name }}</dd>
+      <dt>Their bill</dt>
+      <dd><a href="/purchases/{{ serial.purchase_id }}">{{ serial.bill_number or '(no number)' }}</a>
+        · {{ serial.bill_date|date }}</dd>
+      <dt>Purchase date</dt><dd>{{ serial.purchase_date|date }}</dd>
+    </dl>
+    {% else %}
+    <p class="empty">Entered by hand — no purchase bill is linked to this unit.</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Where it went</h2>
+    {% if serial.sale_id %}
+    <dl class="kv">
+      <dt>Invoice</dt>
+      <dd><a class="mono" href="/sales/{{ serial.sale_id }}/invoice">{{ serial.invoice_number }}</a>
+        {% if serial.sale_void %}<span class="pill pill-danger">cancelled</span>{% endif %}</dd>
+      <dt>Date</dt><dd>{{ serial.invoice_date|date }}</dd>
+      <dt>Customer</dt><dd>{{ serial.customer_name or 'Counter sale' }}</dd>
+      <dt>Phone</dt><dd>{{ serial.customer_phone or '—' }}</dd>
+      <dt>Sold at</dt><dd>{{ serial.sold_at|datetime if serial.sold_at else '—' }}</dd>
+    </dl>
+    {% else %}
+    <p class="empty">Not sold yet — it is sitting in stock.</p>
+    {% endif %}
+  </section>
+</div>
+
+<div class="grid2">
+  <section class="card">
+    <h2>Correct the warranty</h2>
+    <p class="fineprint">Brands sometimes extend or shorten cover on a specific unit. Set the
+      months and the expiry is recalculated from the sale date, or type an exact expiry date to
+      override it.</p>
+    <form method="post" action="/serials/{{ serial.id }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <div class="formgrid">
+        <label>Warranty months
+          <input name="warranty_months" type="number" min="0" step="1"
+                 value="{{ serial.warranty_months }}">
+        </label>
+        <label>Expiry date (overrides the months)
+          <input name="warranty_expiry" type="date" value="{{ serial.warranty_expiry or '' }}">
+        </label>
+        <label class="span-all">Notes
+          <textarea name="notes" rows="2"
+            placeholder="RMA reference, replacement unit, what the brand agreed…">{{ serial.notes }}</textarea>
+        </label>
+      </div>
+      <button class="btn btn-primary" type="submit">Save warranty</button>
+    </form>
+  </section>
+
+  <section class="card">
+    <h2>Move this unit</h2>
+    {% if serial.status == 'sold' %}
+    <p class="empty">This unit is on invoice
+      <a href="/sales/{{ serial.sale_id }}">{{ serial.invoice_number }}</a>.
+      Cancel that invoice to release the serial — that keeps stock and the invoice in step
+      instead of quietly disagreeing.</p>
+    {% else %}
+    <p class="fineprint">Marking a unit returned sends it back to the dealer and takes it out of
+      stock. Marking it in stock brings it back in. Both changes are written to the stock ledger.</p>
+    <div class="btn-row">
+      {% if serial.status != 'returned' %}
+      <form method="post" action="/serials/{{ serial.id }}/status" class="inline"
+            data-confirm="Mark {{ serial.serial_no }} as returned to the dealer and remove it from stock?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="status" value="returned">
+        <button class="btn btn-danger" type="submit">Returned to dealer</button>
+      </form>
+      {% endif %}
+      {% if serial.status != 'in_stock' %}
+      <form method="post" action="/serials/{{ serial.id }}/status" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="status" value="in_stock">
+        <button class="btn btn-primary" type="submit">Back in stock</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
+  </section>
+</div>
+
+{% endblock %}
