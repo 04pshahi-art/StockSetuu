@@ -1,0 +1,54 @@
+# Pratyush Computer Services — shop management
+#
+# Install into a virtualenv:
+#     python -m venv .venv
+#     .venv\Scripts\activate            (Windows)
+#     pip install -r requirements.txt
+#
+# Pinned deliberately. This runs one shop's books on one server; an unattended
+# upgrade that changes Pydantic's validation behaviour is a bigger risk than
+# missing a point release.
+
+fastapi==0.141.1
+starlette==1.6.0
+pydantic==2.12.5
+jinja2==3.1.6
+uvicorn==0.52.4
+python-multipart==0.0.32
+
+
+# -- encryption at rest: REQUIRED on the shop server --------------------------
+#
+# Without this the database file is plain SQLite, readable by anyone who copies
+# it off the machine or out of a backup. The app refuses to start without it
+# unless ALLOW_UNENCRYPTED_DB=1 is set, which is for a developer's laptop only.
+#
+# The self-contained SQLCipher wheel provides the `sqlcipher3` module. Version
+# 0.6.4 bundles a current SQLCipher release with the Windows memory-security log
+# fix; earlier bundled versions can crash when VirtualLock fails.
+sqlcipher3==0.6.4
+
+
+# -- password hashing ---------------------------------------------------------
+#
+# Optional. app/security.py prefers argon2id, then bcrypt, and falls back to
+# hashlib.scrypt from the standard library, which is itself a sound choice —
+# so the app is secure with none of these installed. Install argon2 if you
+# want the current best practice. Deliberately NOT pinned, unlike everything
+# above: it is optional, the app degrades to a safe fallback if it is missing,
+# and a hash written by one version verifies fine under a later one. Confirmed
+# working — with this installed, "manage.py status" reports argon2id as the
+# live hashing backend rather than the scrypt fallback.
+argon2-cffi
+# bcrypt
+
+
+# -- not used, on purpose -----------------------------------------------------
+#
+# No reportlab / weasyprint: invoices are HTML with an A4 print stylesheet, and
+#   the browser's "Print → Save as PDF" produces the PDF. One less native
+#   dependency to install on a Windows Server, and the invoice stays editable.
+# No openpyxl / pandas: app/tabular.py reads .xlsx with zipfile and
+#   xml.etree from the standard library. The import only needs cell text.
+# No SQLAlchemy: the schema is fixed and the queries are hand-written SQL,
+#   because the GST registers need exact control over the arithmetic.
