@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}{{ sale.invoice_number }} · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Invoice {{ sale.invoice_number }}</h1>
+    <p class="sub">
+      {{ sale.invoice_date|date }} · {{ sale.customer_name or 'Counter sale' }}
+      · {{ sale.payment_mode }}
+      {% if sale.is_void %}<span class="pill pill-danger">cancelled</span>{% endif %}
+      · <span class="pill">{{ 'IGST' if sale.interstate else 'CGST + SGST' }}</span>
+    </p>
+  </div>
+  <div class="pageactions">
+    <a class="btn btn-primary" href="/sales/{{ sale.id }}/invoice">Print invoice</a>
+    <a class="btn" href="/sales/new">+ New sale</a>
+  </div>
+</div>
+
+{% if sale.is_void %}
+<div class="flash err">
+  Cancelled{% if sale.voided_at %} on {{ sale.voided_at|datetime }}{% endif %}. Stock has been
+  put back and any serials returned to stock.
+  {% if sale.void_reason %}Reason: {{ sale.void_reason }}{% endif %}
+  The invoice number stays in the series and is reported as a cancelled invoice.
+</div>
+{% endif %}
+
+<div class="grid2">
+  <section class="card">
+    <h2>Buyer</h2>
+    <dl class="kv">
+      <dt>Name</dt><dd>{{ sale.customer_name or 'Counter sale (unregistered)' }}</dd>
+      <dt>Phone</dt><dd>{{ sale.customer_phone or '—' }}</dd>
+      <dt>GSTIN</dt><dd>
+        {% if sale.customer_gstin %}<span class="mono">{{ sale.customer_gstin }}</span>
+          <span class="pill pill-info">B2B</span>
+        {% else %}<span class="pill">B2C</span>{% endif %}
+      </dd>
+      <dt>Place of supply</dt>
+      <dd>{{ (sale.customer_state_code or shop.state_code or '27')|state }}
+        ({{ sale.customer_state_code or shop.state_code or '27' }})</dd>
+      <dt>Address</dt><dd>{{ sale.customer_address or '—' }}</dd>
+      <dt>Entered</dt><dd>{{ sale.created_at|datetime }}</dd>
+    </dl>
+    {% if sale.notes %}<p class="note">{{ sale.notes }}</p>{% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Amounts</h2>
+    <table class="totals">
+      <tr><th>Taxable value</th><td class="num">{{ sale.taxable_paise|money(symbol=True) }}</td></tr>
+      {% if sale.interstate %}
+      <tr><th>IGST</th><td class="num">{{ sale.igst_paise|money(symbol=True) }}</td></tr>
+      {% else %}
+      <tr><th>CGST</th><td class="num">{{ sale.cgst_paise|money(symbol=True) }}</td></tr>
+      <tr><th>SGST</th><td class="num">{{ sale.sgst_paise|money(symbol=True) }}</td></tr>
+      {% endif %}
+      {% if sale.round_off_paise %}
+      <tr><th>Round off</th><td class="num">{{ sale.round_off_paise|money(symbol=True) }}</td></tr>
+      {% endif %}
+      <tr class="grand"><th>Grand total</th><td class="num">{{ sale.total_paise|money(symbol=True) }}</td></tr>
+    </table>
+    {% if sale.prices_include_gst %}
+    <p class="fineprint">Rates were entered inclusive of GST, so the taxable value was worked
+      back out of them.</p>
+    {% endif %}
+  </section>
+</div>
+
+<section class="card flush">
+  <div class="cardhead"><h2>Items</h2></div>
+  <div class="tablewrap">
+  <table class="table stack">
+    <thead>
+      <tr>
+        <th>Item</th><th>HSN</th><th class="num">Qty</th><th class="num">Rate</th>
+        <th class="num">Disc.</th><th class="num">Taxable</th><th class="num">GST</th>
+        <th class="num">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in items %}
+      <tr>
+        <td>
+          <a href="/products/{{ i.product_id }}">{{ i.product_name }}</a>
+          <small>{{ i.sku }}</small>
+          {% set serials = serials_by_item.get(i.id, []) %}
+          {% if serials %}
+          <small class="mono">{{ serials|join(', ') }}</small>
+          {% endif %}
+        </td>
+        <td>{{ i.hsn_code or '—' }}</td>
+        <td class="num">{{ i.qty }} {{ i.unit }}</td>
+        <td class="num">{{ i.unit_price_paise|money }}</td>
+        <td class="num">{{ i.discount_paise|money if i.discount_paise else '—' }}</td>
+        <td class="num">{{ i.taxable_paise|money }}</td>
+        <td class="num">{{ (i.cgst_paise + i.sgst_paise + i.igst_paise)|money }}
+          <small>{{ i.gst_rate_bp|rate }}</small></td>
+        <td class="num"><strong>{{ i.total_paise|money }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+{% if not sale.is_void %}
+<section class="card">
+  <h2>Cancel this invoice</h2>
+  <p class="fineprint">Stock goes back, sold serials return to stock, and the invoice is marked
+    cancelled. The number is <strong>not</strong> reused and <strong>not</strong> deleted —
+    a gap in the series is exactly what GST rules do not allow. Issue a fresh invoice instead.</p>
+  <form method="post" action="/sales/{{ sale.id }}/void"
+        data-confirm="Cancel invoice {{ sale.invoice_number }} and put the stock back?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="formgrid">
+      <label class="span2">Reason
+        <input name="reason" placeholder="Wrong item, customer returned it, typing mistake…">
+      </label>
+    </div>
+    <button class="btn btn-danger" type="submit">Cancel invoice</button>
+  </form>
+</section>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block title %}{{ dealer.name }} · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>{{ dealer.name }}</h1>
+    <p class="sub">
+      {% if dealer.gstin %}<span class="mono">{{ dealer.gstin }}</span> · {% endif %}
+      {{ dealer.state_code|state if dealer.state_code else 'state not set' }}
+      {% if dealer.contact_number %} · {{ dealer.contact_number }}{% endif %}
+      {% if not dealer.is_active %}<span class="pill pill-warn">inactive</span>{% endif %}
+    </p>
+  </div>
+  <div class="pageactions">
+    <a class="btn btn-primary" href="/purchases/new">Record a bill</a>
+    <a class="btn" href="/dealers/{{ dealer.id }}/edit">Edit</a>
+    <a class="btn" href="/reports/gst/purchases">Purchase register</a>
+  </div>
+</div>
+
+<div class="tiles">
+  <div class="tile">
+    <span class="tile-label">Total bought</span>
+    <span class="tile-value">{{ totals.total|money(symbol=True) }}</span>
+    <span class="tile-foot">{{ purchases|length }} bill(s) on record</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Taxable value</span>
+    <span class="tile-value">{{ totals.taxable|money(symbol=True) }}</span>
+    <span class="tile-foot">excluding GST</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">GST paid to them</span>
+    <span class="tile-value">{{ (totals.cgst + totals.sgst + totals.igst)|money(symbol=True) }}</span>
+    <span class="tile-foot">
+      {% if totals.igst %}IGST {{ totals.igst|money }}{% else %}CGST {{ totals.cgst|money }} + SGST {{ totals.sgst|money }}{% endif %}
+    </span>
+  </div>
+</div>
+
+{% if dealer.address or dealer.notes %}
+<div class="card">
+  <div class="formgrid">
+    {% if dealer.address %}<div><h3>Address</h3><p style="white-space: pre-wrap">{{ dealer.address }}</p></div>{% endif %}
+    {% if dealer.notes %}<div><h3>Notes</h3><p style="white-space: pre-wrap">{{ dealer.notes }}</p></div>{% endif %}
+  </div>
+</div>
+{% endif %}
+
+<section class="card flush">
+  <div class="cardhead">
+    <h2>What they supply, and at what price</h2>
+    <span class="fineprint">Lowest / highest / most recent cost per item</span>
+  </div>
+  <div class="tablewrap">
+  <table class="table stack">
+    <thead>
+      <tr><th>Item</th><th class="num">Qty bought</th><th class="num">Lowest</th>
+        <th class="num">Highest</th><th class="num">Last paid</th><th>Last bill</th><th class="actions">&nbsp;</th></tr>
+    </thead>
+    <tbody>
+      {% for i in items %}
+      <tr>
+        <td><a href="/products/{{ i.product_id }}">{{ i.name }}</a><small>{{ i.sku }}</small></td>
+        <td class="num">{{ i.total_qty }}</td>
+        <td class="num">{{ i.min_cost|money }}</td>
+        <td class="num">{{ i.max_cost|money }}</td>
+        <td class="num">{{ i.last_cost|money }}</td>
+        <td>{{ i.last_date|date }}</td>
+        <td class="actions">
+          <a class="btn btn-sm" href="/reports/dealers?product_id={{ i.product_id }}">Compare</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">Nothing bought from this dealer yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="card flush">
+  <div class="cardhead"><h2>Bill history</h2></div>
+  <div class="tablewrap">
+  <table class="table stack">
+    <thead>
+      <tr><th>Bill date</th><th>Their bill no.</th><th class="num">Items</th>
+        <th class="num">Taxable</th><th class="num">GST</th><th class="num">Total</th></tr>
+    </thead>
+    <tbody>
+      {% for p in purchases %}
+      <tr class="{{ 'row-void' if p.is_void else '' }}">
+        <td>{{ p.bill_date|date }}</td>
+        <td><a href="/purchases/{{ p.id }}">{{ p.bill_number or '(no number)' }}</a>
+          {% if p.is_void %}<span class="pill pill-danger">cancelled</span>{% endif %}</td>
+        <td class="num">{{ p.item_count }}</td>
+        <td class="num">{{ p.taxable_paise|money }}</td>
+        <td class="num">{{ (p.cgst_paise + p.sgst_paise + p.igst_paise)|money }}</td>
+        <td class="num">{{ p.total_paise|money }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty">No bills recorded.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+{% endblock %}

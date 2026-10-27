@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% block title %}Warranty lookup · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Warranty lookup</h1>
+    <p class="sub">A customer walks in with a faulty camera. Scan its serial, or type their
+      name or phone number, and see what they bought and whether it is still in warranty.</p>
+  </div>
+  <a class="btn" href="/serials">All serial numbers</a>
+</div>
+
+<form class="card" method="get" action="/warranty">
+  <div class="scanbar">
+    <label>Serial number, customer name, phone or invoice number
+      <input type="search" name="q" value="{{ term }}" data-scan-submit
+             autocomplete="off" spellcheck="false"
+             placeholder="Scan the serial, or type a name / phone">
+    </label>
+    <button class="btn btn-primary" type="submit">Search</button>
+  </div>
+  <p class="fineprint">The scanner presses Enter for you, so scanning the sticker is the whole
+    interaction.</p>
+</form>
+
+{% if term %}
+
+<section class="card flush">
+  <div class="cardhead">
+    <h2>Serial-tracked items ({{ results|length }})</h2>
+  </div>
+  <div class="tablewrap">
+  <table class="table stack">
+    <thead>
+      <tr>
+        <th>Serial</th><th>Item</th><th>Sold to</th><th>Invoice</th>
+        <th>Warranty until</th><th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in results %}
+      <tr class="{{ 'row-danger' if s.warranty_state == 'expired' else ('row-warn' if s.warranty_state == 'expiring' else '') }}">
+        <td><a class="mono" href="/serials/{{ s.id }}">{{ s.serial_no }}</a></td>
+        <td>{{ s.product_name }}
+          <small>{{ s.sku }}{% if s.brand %} · {{ s.brand }}{% endif %}</small>
+        </td>
+        <td>{{ s.customer_name or ('—' if s.status != 'sold' else 'Counter sale') }}
+          <small>{{ s.customer_phone or '' }}</small>
+        </td>
+        <td>
+          {% if s.sale_ref %}
+          <a href="/sales/{{ s.sale_ref }}/invoice" class="mono">{{ s.invoice_number }}</a>
+          <small>{{ s.invoice_date|date }}</small>
+          {% if s.sale_void %}<span class="pill pill-danger">cancelled</span>{% endif %}
+          {% else %}—{% endif %}
+        </td>
+        <td>
+          {{ s.warranty_expiry|date if s.warranty_expiry else 'not recorded' }}
+          {% if s.days_remaining is not none %}
+          <small>
+            {% if s.days_remaining < 0 %}expired {{ -s.days_remaining }} days ago
+            {% else %}{{ s.days_remaining }} days left{% endif %}
+          </small>
+          {% endif %}
+        </td>
+        <td>
+          {% if s.warranty_state == 'active' %}<span class="pill pill-ok">in warranty</span>
+          {% elif s.warranty_state == 'expiring' %}<span class="pill pill-warn">expiring soon</span>
+          {% elif s.warranty_state == 'expired' %}<span class="pill pill-danger">expired</span>
+          {% else %}<span class="pill">no warranty on file</span>{% endif %}
+          <small>{{ s.status.replace('_', ' ') }}</small>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="6" class="empty">
+        No serial number, customer or invoice matches “{{ term }}”.
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section class="card flush">
+  <div class="cardhead">
+    <h2>Their other invoices ({{ other_sales|length }})</h2>
+  </div>
+  <p class="fineprint" style="padding: 0 var(--gap)">
+    Plenty of parts have no serial number. These are all the invoices matching the same search,
+    so “what did this person buy from us” is answerable either way.
+  </p>
+  <div class="tablewrap">
+  <table class="table stack compact">
+    <thead><tr><th>Invoice</th><th>Date</th><th>Customer</th><th class="num">Total</th></tr></thead>
+    <tbody>
+      {% for s in other_sales %}
+      <tr class="{{ 'row-void' if s.is_void else '' }}">
+        <td><a class="mono" href="/sales/{{ s.id }}">{{ s.invoice_number }}</a>
+          {% if s.is_void %}<span class="pill pill-danger">cancelled</span>{% endif %}</td>
+        <td>{{ s.invoice_date|date }}</td>
+        <td>{{ s.customer_name or 'Counter sale' }} <small>{{ s.customer_phone or '' }}</small></td>
+        <td class="num">{{ s.total_paise|money }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="empty">No invoices match this search.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+{% else %}
+<div class="card">
+  <p class="empty">Scan a serial number or type a customer name to begin.</p>
+</div>
+{% endif %}
+
+{% endblock %}

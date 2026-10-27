@@ -1,0 +1,132 @@
+{% extends "base.html" %}
+{% block title %}New service job · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>New service job</h1>
+    <p class="sub">Installation, repair, AMC visit — labour work, kept separate from inventory.
+      Parts fitted during the job can be deducted from stock here.</p>
+  </div>
+  <a class="btn btn-quiet" href="/services">Cancel</a>
+</div>
+
+<form method="post" action="/services"
+      data-line-editor="service"
+      data-price-field="unit_price"
+      data-shop-state="{{ shop_state }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="parts_json" value="[]" data-lines-json>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Customer &amp; job</h2>
+      <div class="formgrid">
+        <label>Job date *
+          <input name="job_date" type="date" value="{{ today }}" required>
+        </label>
+        <label>Status
+          <select name="status">
+            <option value="pending">Pending</option>
+            <option value="completed">Completed</option>
+          </select>
+        </label>
+        <label class="span2">Customer name *
+          <input name="customer_name" required autocomplete="off">
+        </label>
+        <label>Phone
+          <input name="customer_phone" inputmode="tel" autocomplete="off">
+        </label>
+        <label>Place of supply
+          <select name="customer_state_code">
+            <option value="">Maharashtra (default)</option>
+            {% for code, name in STATES %}
+            <option value="{{ code }}">{{ code }} — {{ name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label class="span-all">Site address
+          <textarea name="customer_address" rows="2"
+                    placeholder="Where the work was done"></textarea>
+        </label>
+        <label class="span-all">What was done *
+          <textarea name="description" rows="3" required
+            placeholder="4 dome cameras installed, DVR configured, 30m cable laid…"></textarea>
+        </label>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Charges</h2>
+      <div class="formgrid">
+        <label>Labour / service charge (₹) *
+          <input name="amount" inputmode="decimal" value="0.00" required>
+          <span class="hint">Parts are charged separately below.</span>
+        </label>
+        <label>SAC code
+          <input name="sac_code" value="{{ default_sac }}" inputmode="numeric" maxlength="8">
+          <span class="hint">The service equivalent of an HSN code. 998713 is repair and
+            maintenance of computers and peripherals.</span>
+        </label>
+        <label>GST on the service
+          <select name="gst_rate">
+            <option value="0">0% — not charged</option>
+            {% for bp in GST_SLABS_BP %}
+            {% if bp %}
+            <option value="{{ bp / 100 }}" {{ 'selected' if bp == default_rate_bp else '' }}>
+              {{ SLAB_LABELS[bp] }}
+            </option>
+            {% endif %}
+            {% endfor %}
+          </select>
+          <span class="hint">Split into CGST + SGST for Maharashtra, charged as IGST otherwise.</span>
+        </label>
+        <label class="span-all">Notes
+          <textarea name="notes" rows="2"
+                    placeholder="Follow-up needed, warranty visit, whom to call…"></textarea>
+        </label>
+      </div>
+      <p class="fineprint">Service jobs are not part of the sales invoice series. They are
+        reported separately in the GST sales register so goods and services do not get mixed up.</p>
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Parts used (optional)</h2>
+    <div class="scanbar">
+      <label>Scan barcode
+        <input data-scan autocomplete="off" spellcheck="false"
+               placeholder="Scan anything fitted at the site">
+      </label>
+      <span class="scanhint">Anything added here is deducted from stock when the job is saved.</span>
+    </div>
+    <div class="formgrid">
+      <label class="span2">…or search by name / SKU
+        <input data-search autocomplete="off" placeholder="Type at least 2 characters">
+      </label>
+    </div>
+    <div class="btn-row" data-search-results style="margin-bottom: 12px"></div>
+
+    <div class="tablewrap">
+      <table class="lines">
+        <thead>
+          <tr><th>Part</th><th class="num">Qty</th><th class="num">Charge each</th>
+            <th class="num">Line total</th><th></th></tr>
+        </thead>
+        <tbody data-lines-body></tbody>
+      </table>
+    </div>
+    <p class="fineprint" data-line-count></p>
+    <div data-totals></div>
+    <p class="fineprint">Parts are charged at the amount entered here and the GST above applies to
+      the labour charge only. If the customer needs a tax invoice showing GST on the parts
+      themselves, bill those on a <a href="/sales/new">sale</a> and keep only the labour on this job.</p>
+  </section>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" type="submit">Save job</button>
+    <a class="btn btn-quiet" href="/services">Cancel</a>
+  </div>
+</form>
+
+{% endblock %}

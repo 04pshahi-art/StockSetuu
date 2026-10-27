@@ -1,0 +1,126 @@
+{% extends "base.html" %}
+{% block title %}{{ 'New product' if is_new else product.name }} · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <h1>{{ 'New product' if is_new else 'Edit ' ~ product.name }}</h1>
+  <div class="pageactions">
+    {% if not is_new %}<a class="btn" href="/products/{{ product.id }}">View</a>{% endif %}
+    <a class="btn btn-quiet" href="/products">Back to list</a>
+  </div>
+</div>
+
+<form class="card" method="post" action="{{ '/products' if is_new else '/products/' ~ product.id }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+  <fieldset>
+    <legend>Identification</legend>
+    <div class="formgrid">
+      <label>SKU / Barcode *
+        <input name="sku" value="{{ product.sku }}" required autofocus
+               autocomplete="off" spellcheck="false">
+        <span class="hint">Scan the barcode straight into this box, or type your own code.</span>
+      </label>
+      <label class="span2">Product name *
+        <input name="name" value="{{ product.name }}" required>
+      </label>
+      <label>Category
+        <select name="category">
+          {% for c in categories %}
+          <option value="{{ c }}" {{ 'selected' if c == product.category else '' }}>{{ c }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>Brand
+        <input name="brand" value="{{ product.brand }}">
+      </label>
+      <label>Unit
+        <input name="unit" value="{{ product.unit }}" placeholder="Nos">
+      </label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>GST</legend>
+    <div class="formgrid">
+      <label>HSN code
+        <input name="hsn_code" value="{{ product.hsn_code }}" inputmode="numeric"
+               pattern="[0-9]*" maxlength="8">
+        <span class="hint">Printed on every invoice line. 8517 / 85258900 style.</span>
+      </label>
+      <label>GST rate
+        <select name="gst_rate">
+          {% for bp in GST_SLABS_BP %}
+          <option value="{{ bp / 100 }}" {{ 'selected' if bp == product.gst_rate_bp else '' }}>
+            {{ SLAB_LABELS[bp] }}
+          </option>
+          {% endfor %}
+        </select>
+        <span class="hint">Intra-state sales split this into CGST + SGST automatically.</span>
+      </label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Pricing and stock</legend>
+    <div class="formgrid">
+      <label>Cost price (₹)
+        <input name="cost_price" inputmode="decimal" value="{{ product.cost_price_paise|rupees }}">
+      </label>
+      <label>Sale price (₹)
+        <input name="sale_price" inputmode="decimal" value="{{ product.sale_price_paise|rupees }}">
+      </label>
+      {% if is_new %}
+      <label>Opening stock
+        <input name="opening_quantity" type="number" step="1" value="0">
+        <span class="hint">Recorded as an opening stock movement, not a silent edit.</span>
+      </label>
+      {% else %}
+      <label>Current stock
+        <input value="{{ product.quantity }} {{ product.unit }}" readonly>
+        <span class="hint"><a href="/products/{{ product.id }}">Adjust it from the product page</a>
+          so the change is logged.</span>
+      </label>
+      {% endif %}
+      <label>Low-stock alert at
+        <input name="low_stock_threshold" type="number" min="0" step="1"
+               value="{{ product.low_stock_threshold }}">
+      </label>
+    </div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Warranty and notes</legend>
+    <div class="formgrid">
+      <label>Warranty (months)
+        <input name="warranty_months" type="number" min="0" step="1" value="{{ product.warranty_months }}">
+      </label>
+      <label class="span2">
+        <span class="check">
+          <input type="checkbox" name="is_serialized" value="1"
+                 {{ 'checked' if product.is_serialized else '' }}>
+          Track individual serial numbers
+        </span>
+        <span class="hint">Turn this on for cameras, DVRs, drives — anything with a warranty
+          you may need to look up later. Sales will then ask for one serial per unit.</span>
+      </label>
+      <label class="span-all">Specification / notes
+        <textarea name="specs" rows="4"
+          placeholder="Free text — resolution, capacity, channels, compatible models, anything.">{{ product.specs }}</textarea>
+        <span class="hint">One free-text field on purpose, so computer parts and CCTV gear can
+          each be described in their own terms.</span>
+      </label>
+      <label class="span-all check">
+        <input type="checkbox" name="is_active" value="1" {{ 'checked' if product.is_active else '' }}>
+        Active (uncheck to hide from sale and purchase screens without deleting history)
+      </label>
+    </div>
+  </fieldset>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" type="submit">{{ 'Create product' if is_new else 'Save changes' }}</button>
+    <a class="btn btn-quiet" href="{{ '/products' if is_new else '/products/' ~ product.id }}">Cancel</a>
+  </div>
+</form>
+
+{% endblock %}

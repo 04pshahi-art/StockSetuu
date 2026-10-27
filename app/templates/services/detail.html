@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}{{ job.job_number }} · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Job {{ job.job_number }}</h1>
+    <p class="sub">
+      {{ job.customer_name }}
+      {% if job.customer_phone %} · {{ job.customer_phone }}{% endif %}
+      · {{ job.job_date|date }}
+      {% if job.status == 'pending' %}<span class="pill pill-warn">pending</span>
+      {% elif job.status == 'completed' %}<span class="pill pill-ok">completed</span>
+      {% else %}<span class="pill pill-danger">cancelled</span>{% endif %}
+    </p>
+  </div>
+  <div class="pageactions">
+    <button class="btn" type="button" data-print>Print job sheet</button>
+    <a class="btn btn-primary" href="/services/new">+ New job</a>
+  </div>
+</div>
+
+<div class="grid2">
+  <section class="card">
+    <h2>Work done</h2>
+    <p style="white-space: pre-wrap; margin-top: 0">{{ job.description or '—' }}</p>
+    <dl class="kv">
+      <dt>Site address</dt><dd>{{ job.customer_address or '—' }}</dd>
+      <dt>Place of supply</dt>
+      <dd>{{ job.customer_state_code|state if job.customer_state_code else '—' }}
+        ({{ job.customer_state_code or '—' }})</dd>
+      <dt>SAC code</dt><dd>{{ job.sac_code or 'not set' }}</dd>
+      <dt>Logged</dt><dd>{{ job.created_at|datetime }}</dd>
+      {% if job.completed_at %}
+      <dt>Completed</dt><dd>{{ job.completed_at|datetime }}</dd>
+      {% endif %}
+    </dl>
+  </section>
+
+  <section class="card">
+    <h2>Charges</h2>
+    <table class="totals">
+      <tr><th>Labour / service</th><td class="num">{{ job.amount_paise|money(symbol=True) }}</td></tr>
+      {% if job.cgst_paise or job.sgst_paise %}
+      <tr><th>CGST</th><td class="num">{{ job.cgst_paise|money(symbol=True) }}</td></tr>
+      <tr><th>SGST</th><td class="num">{{ job.sgst_paise|money(symbol=True) }}</td></tr>
+      {% endif %}
+      {% if job.igst_paise %}
+      <tr><th>IGST</th><td class="num">{{ job.igst_paise|money(symbol=True) }}</td></tr>
+      {% endif %}
+      {% if job.parts_total_paise %}
+      <tr><th>Parts</th><td class="num">{{ job.parts_total_paise|money(symbol=True) }}</td></tr>
+      {% endif %}
+      <tr class="grand"><th>Total</th><td class="num">{{ job.total_paise|money(symbol=True) }}</td></tr>
+    </table>
+    <p class="fineprint">
+      GST {{ job.gst_rate_bp|rate }} on the labour charge
+      {%- if job.igst_paise %} as IGST (inter-state){% elif job.cgst_paise %} split as CGST + SGST{% endif %}.
+      Parts are billed at the amount entered on the job.
+    </p>
+    <p class="fineprint">This job is outside the invoice series. It appears as a separate line in
+      the <a href="/reports/gst/sales">GST sales register</a> so services are not confused with
+      the goods invoices.</p>
+  </section>
+</div>
+
+{% if parts %}
+<section class="card flush">
+  <div class="cardhead"><h2>Parts used ({{ parts|length }})</h2></div>
+  <div class="tablewrap">
+  <table class="table stack">
+    <thead><tr><th>Part</th><th class="num">Qty</th><th class="num">Charge each</th><th class="num">Total</th></tr></thead>
+    <tbody>
+      {% for p in parts %}
+      <tr>
+        <td><a href="/products/{{ p.product_id }}">{{ p.product_name }}</a><small>{{ p.sku }}</small></td>
+        <td class="num">{{ p.qty }} {{ p.unit }}</td>
+        <td class="num">{{ p.unit_price_paise|money }}</td>
+        <td class="num"><strong>{{ p.total_paise|money }}</strong></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr><th colspan="3">Parts total</th><td class="num">{{ job.parts_total_paise|money }}</td></tr>
+    </tfoot>
+  </table>
+  </div>
+  <p class="fineprint" style="padding: 0 var(--gap) var(--gap)">
+    These were deducted from stock when the job was saved. Cancelling the job puts them back.
+  </p>
+</section>
+{% endif %}
+
+<div class="grid2 noprint">
+  <section class="card">
+    <h2>Status</h2>
+    <p class="fineprint">Cancelling a job returns any parts it used to stock. Nothing is deleted.</p>
+    <div class="btn-row">
+      {% if job.status != 'completed' %}
+      <form method="post" action="/services/{{ job.id }}/status" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="status" value="completed">
+        <button class="btn btn-primary" type="submit">Mark completed</button>
+      </form>
+      {% endif %}
+      {% if job.status != 'pending' %}
+      <form method="post" action="/services/{{ job.id }}/status" class="inline">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="status" value="pending">
+        <button class="btn" type="submit">Reopen as pending</button>
+      </form>
+      {% endif %}
+      {% if job.status != 'cancelled' %}
+      <form method="post" action="/services/{{ job.id }}/status" class="inline"
+            data-confirm="Cancel this job and return any parts used to stock?">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="status" value="cancelled">
+        <button class="btn btn-danger" type="submit">Cancel job</button>
+      </form>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Notes</h2>
+    <form method="post" action="/services/{{ job.id }}/notes">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+      <label>
+        <textarea name="notes" rows="4"
+          placeholder="Follow-up needed, what the customer said, whom to call…">{{ job.notes }}</textarea>
+      </label>
+      <button class="btn btn-primary" type="submit">Save notes</button>
+    </form>
+  </section>
+</div>
+
+{% endblock %}

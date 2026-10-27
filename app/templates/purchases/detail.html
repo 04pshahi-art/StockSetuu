@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% block title %}Purchase {{ purchase.bill_number or purchase.id }} · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Purchase from {{ purchase.dealer_name }}</h1>
+    <p class="sub">
+      Their bill <strong>{{ purchase.bill_number or '(no number)' }}</strong>
+      dated {{ purchase.bill_date|date }}
+      {% if purchase.is_void %}<span class="pill pill-danger">cancelled</span>{% endif %}
+      · <span class="pill">{{ 'IGST (inter-state)' if purchase.interstate else 'CGST + SGST (intra-state)' }}</span>
+    </p>
+  </div>
+  <div class="pageactions">
+    <a class="btn" href="/dealers/{{ purchase.dealer_id }}">Dealer</a>
+    <a class="btn btn-primary" href="/purchases/new">+ Another purchase</a>
+  </div>
+</div>
+
+{% if mismatch.taxable or mismatch.tax %}
+<div class="flash warn">
+  <strong>Line sums do not match the bill header.</strong>
+  Our lines add up to {{ line_taxable|money(symbol=True) }} taxable and
+  {{ line_tax|money(symbol=True) }} GST, while the figures entered from the dealer's bill are
+  {{ purchase.taxable_paise|money(symbol=True) }} and
+  {{ (purchase.cgst_paise + purchase.sgst_paise + purchase.igst_paise)|money(symbol=True) }}.
+  Difference: {{ mismatch.taxable|money(symbol=True) }} taxable, {{ mismatch.tax|money(symbol=True) }} GST.
+  The bill header is what the registers report, because that is what the dealer actually charged —
+  this is only here so you can spot a typo or a discount you did not record on a line.
+</div>
+{% endif %}
+
+{% if purchase.is_void %}
+<div class="flash err">
+  This purchase was cancelled{% if purchase.voided_at %} on {{ purchase.voided_at|datetime }}{% endif %}
+  and the stock it added has been reversed.
+  {% if purchase.void_reason %}Reason: {{ purchase.void_reason }}{% endif %}
+</div>
+{% endif %}
+
+<div class="grid2">
+  <section class="card">
+    <h2>Dealer</h2>
+    <dl class="kv">
+      <dt>Name</dt><dd>{{ purchase.dealer_name }}</dd>
+      <dt>GSTIN</dt><dd>
+        {% if purchase.dealer_gstin %}<span class="mono">{{ purchase.dealer_gstin }}</span>
+        {% else %}<span class="pill pill-warn">not on file</span>
+          <small>Input tax credit on this bill cannot be substantiated without it.</small>
+        {% endif %}
+      </dd>
+      <dt>State</dt><dd>{{ purchase.dealer_state|state if purchase.dealer_state else '—' }}</dd>
+      <dt>Phone</dt><dd>{{ purchase.dealer_phone or '—' }}</dd>
+      <dt>Recorded</dt><dd>{{ purchase.created_at|datetime }}</dd>
+    </dl>
+    {% if purchase.notes %}
+    <p class="note">{{ purchase.notes }}</p>
+    {% endif %}
+  </section>
+
+  <section class="card">
+    <h2>Amounts as printed on their bill</h2>
+    <table class="totals">
+      <tr><th>Taxable value</th><td class="num">{{ purchase.taxable_paise|money(symbol=True) }}</td></tr>
+      {% if purchase.cgst_paise or purchase.sgst_paise %}
+      <tr><th>CGST</th><td class="num">{{ purchase.cgst_paise|money(symbol=True) }}</td></tr>
+      <tr><th>SGST</th><td class="num">{{ purchase.sgst_paise|money(symbol=True) }}</td></tr>
+      {% endif %}
+      {% if purchase.igst_paise %}
+      <tr><th>IGST</th><td class="num">{{ purchase.igst_paise|money(symbol=True) }}</td></tr>
+      {% endif %}
+      {% if purchase.round_off_paise %}
+      <tr><th>Round off</th><td class="num">{{ purchase.round_off_paise|money(symbol=True) }}</td></tr>
+      {% endif %}
+      <tr class="grand"><th>Bill total</th><td class="num">{{ purchase.total_paise|money(symbol=True) }}</td></tr>
+    </table>
+    <p class="fineprint">These are recorded exactly as entered from the dealer's paper bill.
+      The app does not recompute a dealer's GST.</p>
+  </section>
+</div>
+
+<section class="card flush">
+  <div class="cardhead"><h2>Items received</h2></div>
+  <div class="tablewrap">
+  <table class="table stack">
+    <thead>
+      <tr>
+        <th>Item</th><th>HSN</th><th class="num">Qty</th><th class="num">Unit cost</th>
+        <th class="num">GST</th><th class="num">Taxable</th><th class="num">Tax</th><th class="num">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for i in items %}
+      <tr>
+        <td><a href="/products/{{ i.product_id }}">{{ i.product_name }}</a>
+          <small>{{ i.sku }}</small></td>
+        <td>{{ i.hsn_code or '—' }}</td>
+        <td class="num">{{ i.qty }} {{ i.unit }}</td>
+        <td class="num">{{ i.unit_cost_paise|money }}</td>
+        <td class="num">{{ i.gst_rate_bp|rate }}</td>
+        <td class="num">{{ i.taxable_paise|money }}</td>
+        <td class="num">{{ (i.cgst_paise + i.sgst_paise + i.igst_paise)|money }}</td>
+        <td class="num"><strong>{{ i.total_paise|money }}</strong></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="8" class="empty">No items on this bill.</td></tr>
+      {% endfor %}
+    </tbody>
+    <tfoot>
+      <tr>
+        <th colspan="5">Our line sums</th>
+        <td class="num">{{ line_taxable|money }}</td>
+        <td class="num">{{ line_tax|money }}</td>
+        <td class="num">{{ (line_taxable + line_tax)|money }}</td>
+      </tr>
+    </tfoot>
+  </table>
+  </div>
+</section>
+
+{% if serials %}
+<section class="card flush">
+  <div class="cardhead">
+    <h2>Serial numbers registered ({{ serials|length }})</h2>
+    <a href="/serials">All serials</a>
+  </div>
+  <div class="tablewrap">
+  <table class="table stack compact">
+    <thead><tr><th>Serial</th><th>Product</th><th>Status</th><th>Warranty</th><th>Expires</th></tr></thead>
+    <tbody>
+      {% for s in serials %}
+      <tr>
+        <td><a class="mono" href="/serials/{{ s.id }}">{{ s.serial_no }}</a></td>
+        <td>{{ s.product_name }}</td>
+        <td>
+          {% if s.status == 'in_stock' %}<span class="pill pill-ok">in stock</span>
+          {% elif s.status == 'sold' %}<span class="pill pill-info">sold</span>
+          {% else %}<span class="pill pill-warn">returned</span>{% endif %}
+        </td>
+        <td>{{ s.warranty_months }} months</td>
+        <td>{{ s.warranty_expiry|date if s.warranty_expiry else '—' }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+{% endif %}
+
+{% if not purchase.is_void %}
+<section class="card">
+  <h2>Cancel this purchase</h2>
+  <p class="fineprint">Cancelling reverses the stock this bill added and reverts any serial
+    numbers it registered. The record itself is kept, never deleted.
+    If stock has already been sold, the reversal will be refused.</p>
+  <form method="post" action="/purchases/{{ purchase.id }}/void"
+        data-confirm="Cancel this purchase and reverse the stock it added?">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+    <div class="formgrid">
+      <label class="span2">Reason
+        <input name="reason" placeholder="Returned to dealer, entered twice, wrong bill…">
+      </label>
+    </div>
+    <button class="btn btn-danger" type="submit">Cancel purchase</button>
+  </form>
+</section>
+{% endif %}
+
+{% endblock %}

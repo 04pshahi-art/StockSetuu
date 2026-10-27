@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Dealer history · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Dealers</h1>
+    <p class="sub">Spend per dealer between {{ date_from|date }} and {{ date_to|date }},
+      and what each one charged for the same part.</p>
+  </div>
+  <div class="pageactions">
+    <a class="btn" href="/dealers">Manage dealers</a>
+    <button class="btn" type="button" data-print>Print</button>
+  </div>
+</div>
+
+<form class="filters noprint" method="get" action="/reports/dealers">
+  <label>From <input type="date" name="from" value="{{ date_from }}"></label>
+  <label>To <input type="date" name="to" value="{{ date_to }}"></label>
+  <label class="grow">Compare prices for
+    <select name="product_id">
+      <option value="">— pick an item —</option>
+      {% for p in products %}
+      <option value="{{ p.id }}" {{ 'selected' if product_id == p.id|string else '' }}>{{ p.name }} · {{ p.sku }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button class="btn btn-primary" type="submit">Apply</button>
+  <a class="btn btn-quiet" href="/reports/dealers">Clear</a>
+</form>
+
+{% if selected_product %}
+<section class="card">
+  <div class="cardhead">
+    <h2>{{ selected_product.name }} — what each dealer charged</h2>
+    <a href="/products/{{ selected_product.id }}">Open product</a>
+  </div>
+  <table class="table stack compact">
+    <thead>
+      <tr>
+        <th>Dealer</th><th>Bill</th><th>Date</th>
+        <th class="num">Qty</th><th class="num">Unit cost</th><th class="num">GST</th><th class="num">With GST</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in comparison %}
+      <tr class="{{ 'row-warn' if loop.first else '' }}">
+        <td><a href="/dealers/{{ c.dealer_id }}">{{ c.dealer_name }}</a>
+          {% if loop.first %}<span class="pill pill-ok">cheapest</span>{% endif %}
+        </td>
+        <td class="mono">{{ c.bill_number or '—' }}</td>
+        <td>{{ c.bill_date|date }}</td>
+        <td class="num">{{ c.qty }}</td>
+        <td class="num"><strong>{{ c.unit_cost_paise|money }}</strong></td>
+        <td class="num">{{ c.gst_rate_bp|rate }}</td>
+        <td class="num">{{ (c.unit_cost_paise|plus_gst(c.gst_rate_bp))|money }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">This item has never been bought on a recorded bill.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="fineprint">Cheapest first, across <strong>all</strong> bills ever recorded — the date range
+    above does not limit this list, because last year's price is exactly what you want to compare
+    against. Compare on unit cost before GST: the GST comes back to you as input tax credit, so the
+    pre-tax price is the real cost. Prices are per bill, not fixed to the product, so a dealer who
+    quoted differently on two dates shows up twice.</p>
+</section>
+{% endif %}
+
+<div class="card flush">
+  <div class="cardhead" style="padding: var(--gap) var(--gap) 0">
+    <h2>Spend by dealer</h2>
+    <span class="fineprint">{{ date_from|date }} – {{ date_to|date }}</span>
+  </div>
+  <div class="tablewrap">
+  <table class="table stack compact">
+    <thead>
+      <tr>
+        <th>Dealer</th><th>GSTIN</th><th>State</th><th>Contact</th>
+        <th class="num">Bills</th><th class="num">Paid</th><th>Last bill</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for d in dealers %}
+      <tr class="{{ 'muted' if not d.bills else '' }}">
+        <td><a href="/dealers/{{ d.id }}">{{ d.name }}</a></td>
+        <td class="mono">{{ d.gstin or '—' }}
+          {% if not d.gstin %}<span class="pill pill-warn">no ITC</span>{% endif %}
+        </td>
+        <td>{{ d.state_code|state if d.state_code else '—' }}</td>
+        <td>{{ d.contact_number or '—' }}</td>
+        <td class="num">{{ d.bills }}</td>
+        <td class="num"><strong>{{ d.total|money }}</strong></td>
+        <td>{{ d.last_bill|date if d.last_bill else 'nothing in this range' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">No dealers on file yet. <a href="/dealers/new">Add one</a>.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<p class="fineprint">Every dealer is listed, including those you bought nothing from in this range —
+  a dealer showing zero is a dealer you have stopped using, which is worth noticing.</p>
+
+{% endblock %}

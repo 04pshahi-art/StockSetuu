@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Serial numbers · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Serial numbers</h1>
+    <p class="sub">Every serial-tracked unit that has passed through the shop.
+      Serials are registered when a purchase is entered and assigned when the unit is sold.</p>
+  </div>
+  <a class="btn" href="/warranty">Warranty lookup</a>
+</div>
+
+<div class="tiles tiles-3">
+  <div class="tile">
+    <span class="tile-label">In stock</span>
+    <span class="tile-value">{{ counts.in_stock }}</span>
+    <span class="tile-foot"><a href="/serials?status=in_stock">Show these</a></span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Sold</span>
+    <span class="tile-value">{{ counts.sold }}</span>
+    <span class="tile-foot"><a href="/serials?status=sold">Show these</a></span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Returned to dealer</span>
+    <span class="tile-value">{{ counts.returned }}</span>
+    <span class="tile-foot"><a href="/serials?status=returned">Show these</a></span>
+  </div>
+</div>
+
+<form class="filters" method="get" action="/serials">
+  <label class="grow">Search
+    <input type="search" name="q" value="{{ term }}" placeholder="Serial number, product, SKU…">
+  </label>
+  <label>Status
+    <select name="status">
+      <option value="">Any</option>
+      <option value="in_stock" {{ 'selected' if status == 'in_stock' else '' }}>In stock</option>
+      <option value="sold" {{ 'selected' if status == 'sold' else '' }}>Sold</option>
+      <option value="returned" {{ 'selected' if status == 'returned' else '' }}>Returned</option>
+    </select>
+  </label>
+  <label>Product
+    <select name="product_id">
+      <option value="">Any</option>
+      {% for p in products %}
+      <option value="{{ p.id }}" {{ 'selected' if product_id == p.id|string else '' }}>{{ p.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Warranty
+    <select name="expiry">
+      <option value="">Any</option>
+      <option value="soon" {{ 'selected' if expiry_filter == 'soon' else '' }}>Expiring in 30 days</option>
+      <option value="expired" {{ 'selected' if expiry_filter == 'expired' else '' }}>Already expired</option>
+    </select>
+  </label>
+  <button class="btn btn-primary" type="submit">Apply</button>
+  <a class="btn btn-quiet" href="/serials">Clear</a>
+</form>
+
+<div class="card flush">
+  <div class="tablewrap">
+  <table class="table stack">
+    <thead>
+      <tr>
+        <th>Serial</th><th>Product</th><th>Status</th><th>Sold on</th>
+        <th>Warranty until</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in serials %}
+      <tr class="{{ 'row-danger' if s.warranty_state == 'expired' else ('row-warn' if s.warranty_state == 'expiring' else '') }}">
+        <td><a class="mono" href="/serials/{{ s.id }}">{{ s.serial_no }}</a></td>
+        <td><a href="/products/{{ s.product_id }}">{{ s.product_name }}</a>
+          <small>{{ s.sku }}{% if s.brand %} · {{ s.brand }}{% endif %}</small></td>
+        <td>
+          {% if s.status == 'in_stock' %}<span class="pill pill-ok">in stock</span>
+          {% elif s.status == 'sold' %}<span class="pill pill-info">sold</span>
+          {% else %}<span class="pill pill-warn">returned</span>{% endif %}
+        </td>
+        <td>
+          {% if s.invoice_number %}
+          <a class="mono" href="/sales/{{ s.sale_id }}">{{ s.invoice_number }}</a>
+          <small>{{ s.customer_name or 'Counter sale' }} · {{ s.invoice_date|date }}</small>
+          {% else %}—{% endif %}
+        </td>
+        <td>{{ s.warranty_expiry|date if s.warranty_expiry else '—' }}
+          {% if s.days_remaining is not none %}
+          <small>{% if s.days_remaining < 0 %}expired{% else %}{{ s.days_remaining }} days left{% endif %}</small>
+          {% endif %}
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">
+        No serials match. They are created automatically when you enter a purchase of a
+        serial-tracked product.
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<p class="fineprint">Showing at most 500 rows — narrow the filters if you need more than that.</p>
+
+{% endblock %}

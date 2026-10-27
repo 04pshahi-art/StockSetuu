@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Purchases {{ date_from }} to {{ date_to }} · {{ trade }}{% endblock %}
+{% block content %}
+
+{% set qs = '?from=' ~ date_from ~ '&to=' ~ date_to ~ '&dealer_id=' ~ dealer_id %}
+
+<div class="pagehead">
+  <div>
+    <h1>Purchases</h1>
+    <p class="sub">{{ date_from|date }} to {{ date_to|date }} ·
+      {{ totals.count }} bill{{ '' if totals.count == 1 else 's' }}
+      {%- if totals.cancelled %} · {{ totals.cancelled }} cancelled, excluded from every total{% endif %}</p>
+  </div>
+  <div class="pageactions">
+    <a class="btn" href="/reports/purchases{{ qs }}&format=csv">Export CSV</a>
+    <a class="btn" href="/reports/gst/purchases?from={{ date_from }}&to={{ date_to }}">ITC register</a>
+    <button class="btn" type="button" data-print>Print</button>
+  </div>
+</div>
+
+<form class="filters noprint" method="get" action="/reports/purchases">
+  <label>Dealer
+    <select name="dealer_id">
+      <option value="">All dealers</option>
+      {% for d in dealers %}
+      <option value="{{ d.id }}" {{ 'selected' if dealer_id == d.id|string else '' }}>{{ d.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>From <input type="date" name="from" value="{{ date_from }}"></label>
+  <label>To <input type="date" name="to" value="{{ date_to }}"></label>
+  <button class="btn btn-primary" type="submit">Apply</button>
+  <a class="btn btn-quiet" href="/reports/purchases">This month</a>
+</form>
+
+<div class="tiles tiles-3">
+  <div class="tile">
+    <span class="tile-label">Taxable value</span>
+    <span class="tile-value">{{ totals.taxable|money(symbol=True) }}</span>
+    <span class="tile-foot">Cost of stock before GST</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">GST paid to dealers</span>
+    <span class="tile-value">{{ totals.tax|money(symbol=True) }}</span>
+    <span class="tile-foot">Recoverable as input tax credit</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Total paid</span>
+    <span class="tile-value">{{ totals.total|money(symbol=True) }}</span>
+    <span class="tile-foot">As printed on their bills</span>
+  </div>
+</div>
+
+<section class="card">
+  <h2>By dealer</h2>
+  <table class="table compact">
+    <thead>
+      <tr><th>Dealer</th><th class="num">Bills</th><th class="num">Taxable</th><th class="num">Total paid</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for d in by_dealer %}
+      <tr>
+        <td><a href="/dealers/{{ d.id }}">{{ d.name }}</a></td>
+        <td class="num">{{ d.bills }}</td>
+        <td class="num">{{ d.taxable|money }}</td>
+        <td class="num"><strong>{{ d.total|money }}</strong></td>
+        <td class="noprint">
+          <a class="btn btn-sm" href="/reports/purchases?from={{ date_from }}&to={{ date_to }}&dealer_id={{ d.id }}">Only this dealer</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="empty">No purchases in this range.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="fineprint">To see what different dealers charged for the <em>same</em> part, use the
+    <a href="/reports/dealers?from={{ date_from }}&to={{ date_to }}">dealer comparison</a>.</p>
+</section>
+
+<div class="card flush">
+  <div class="cardhead" style="padding: var(--gap) var(--gap) 0"><h2>Every bill</h2></div>
+  <div class="tablewrap">
+  <table class="table stack compact">
+    <thead>
+      <tr>
+        <th>Bill date</th><th>Bill no</th><th>Dealer</th>
+        <th class="num">Items</th><th class="num">Taxable</th><th class="num">GST</th><th class="num">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in purchases %}
+      <tr class="{{ 'row-void' if p.is_void else '' }}">
+        <td>{{ p.bill_date|date }}</td>
+        <td>
+          <a href="/purchases/{{ p.id }}">{{ p.bill_number or '(no bill number)' }}</a>
+          {% if p.is_void %}<span class="pill pill-danger">cancelled</span>{% endif %}
+          {% if p.interstate %}<span class="pill pill-info">IGST</span>{% endif %}
+        </td>
+        <td>{{ p.dealer_name }}<small>{{ p.dealer_gstin or 'no GSTIN — no ITC' }}</small></td>
+        <td class="num">{{ p.item_count }}</td>
+        <td class="num">{{ p.taxable_paise|money }}</td>
+        <td class="num">{{ (p.cgst_paise + p.sgst_paise + p.igst_paise)|money }}</td>
+        <td class="num"><strong>{{ p.total_paise|money }}</strong></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">No bills between these dates.</td></tr>
+      {% endfor %}
+    </tbody>
+    {% if purchases %}
+    <tfoot>
+      <tr>
+        <th colspan="4">{{ totals.count }} live bill{{ '' if totals.count == 1 else 's' }}</th>
+        <th class="num">{{ totals.taxable|money }}</th>
+        <th class="num">{{ totals.tax|money }}</th>
+        <th class="num">{{ totals.total|money }}</th>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+  </div>
+</div>
+
+<p class="fineprint">These are the figures printed on the dealers' bills, entered as they appear.
+  The app does not recalculate their GST — if a bill's lines do not add up to its header, the bill's
+  own page says so.</p>
+
+{% endblock %}

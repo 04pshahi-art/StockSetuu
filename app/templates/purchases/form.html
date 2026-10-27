@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Record a purchase · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Record a purchase (stock in)</h1>
+    <p class="sub">Type the GST figures exactly as they are printed on the dealer's bill.
+      This screen records their bill — it does not recalculate it.</p>
+  </div>
+  <a class="btn btn-quiet" href="/purchases">Cancel</a>
+</div>
+
+<form method="post" action="/purchases"
+      data-line-editor="purchase"
+      data-price-field="unit_cost"
+      data-shop-state="{{ shop_state }}"
+      data-dealer-states='{{ dealer_states|tojson }}'>
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="lines_json" value="[]" data-lines-json>
+
+  <section class="card">
+    <h2>The dealer's bill</h2>
+    <div class="formgrid">
+      <label>Dealer *
+        <select name="dealer_id" required>
+          <option value="">— choose a dealer —</option>
+          {% for d in dealers %}
+          <option value="{{ d.id }}">{{ d.name }}{% if d.gstin %} · {{ d.gstin }}{% endif %}</option>
+          {% endfor %}
+        </select>
+        <span class="hint"><a href="/dealers/new">Add a dealer</a> if they are not listed.
+          Purchases are always linked to a dealer, never free text.</span>
+      </label>
+      <label>Their bill number
+        <input name="bill_number" placeholder="As printed on their invoice" autocomplete="off">
+        <span class="hint">Stored as plain text — no format is imposed. The same number
+          cannot be entered twice for one dealer.</span>
+      </label>
+      <label>Bill date *
+        <input name="bill_date" type="date" value="{{ today }}" required>
+      </label>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Items received</h2>
+    <div class="scanbar">
+      <label>Scan barcode
+        <input data-scan autocomplete="off" spellcheck="false"
+               placeholder="Point the scanner here and shoot">
+      </label>
+      <span class="scanhint">The scanner types the code and presses Enter — nothing to install.</span>
+    </div>
+    <div class="formgrid">
+      <label class="span2">…or search by name / SKU
+        <input data-search autocomplete="off" placeholder="Type at least 2 characters">
+      </label>
+    </div>
+    <div class="btn-row" data-search-results style="margin-bottom: 12px"></div>
+    <p class="fineprint"><a href="/products/new" data-new-product>Create a product</a>
+      if a scanned code is not in the catalogue yet.</p>
+
+    <div class="tablewrap">
+      <table class="lines">
+        <thead>
+          <tr>
+            <th>Item</th><th>HSN</th><th class="num">Qty</th><th class="num">Unit cost</th>
+            <th>GST</th><th class="num">Line total</th><th></th>
+          </tr>
+        </thead>
+        <tbody data-lines-body></tbody>
+      </table>
+    </div>
+    <p class="fineprint" data-line-count></p>
+  </section>
+
+  <div class="grid2">
+    <section class="card">
+      <h2>Totals as printed on their bill</h2>
+      <p class="fineprint">Whatever GST the dealer charged goes in here as-is, so the purchase
+        register mirrors the paper bill. Our own line sums are shown alongside for checking.</p>
+      <div class="formgrid">
+        <label>Taxable value (₹)
+          <input name="bill_taxable" inputmode="decimal" value="0.00">
+        </label>
+        <label>Round off (₹)
+          <input name="bill_round_off" inputmode="decimal" value="0.00">
+        </label>
+        <label>CGST (₹)
+          <input name="bill_cgst" inputmode="decimal" value="0.00">
+        </label>
+        <label>SGST (₹)
+          <input name="bill_sgst" inputmode="decimal" value="0.00">
+        </label>
+        <label>IGST (₹)
+          <input name="bill_igst" inputmode="decimal" value="0.00">
+        </label>
+        <label>Bill total (₹) *
+          <input name="bill_total" inputmode="decimal" value="0.00" required>
+        </label>
+      </div>
+      <p data-bill-check></p>
+      <button class="btn btn-sm" type="button" data-copy-lines>Copy our line sums into these boxes</button>
+    </section>
+
+    <section class="card">
+      <h2>Our calculation of the lines</h2>
+      <div data-totals></div>
+      <hr style="border: 0; border-top: 1px solid var(--line); margin: 14px 0">
+      <label class="check">
+        <input type="checkbox" name="update_cost_prices" value="1" checked>
+        Update each product's cost price to the cost on this bill
+      </label>
+      <label>Notes
+        <textarea name="notes" rows="3" placeholder="Transport, credit terms, anything worth remembering"></textarea>
+      </label>
+    </section>
+  </div>
+
+  <div class="btn-row">
+    <button class="btn btn-primary" type="submit">Save purchase &amp; add to stock</button>
+    <a class="btn btn-quiet" href="/purchases">Cancel</a>
+  </div>
+</form>
+
+{% endblock %}

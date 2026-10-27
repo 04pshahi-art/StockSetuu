@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block title %}Products · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Products</h1>
+    <p class="sub">{{ total }} matching · page {{ page }} of {{ pages }}</p>
+  </div>
+  <div class="pageactions">
+    <a class="btn btn-primary" href="/products/new">+ New product</a>
+    <a class="btn" href="/products/export/csv{{ '?category=' ~ category if category else '' }}">Export CSV</a>
+    <a class="btn" href="/import">Import CSV</a>
+  </div>
+</div>
+
+<form class="filters" method="get" action="/products">
+  <label class="grow">Search
+    <input type="search" name="q" value="{{ term }}" placeholder="Name, SKU, brand, notes…">
+  </label>
+  <label>Category
+    <select name="category">
+      <option value="">All</option>
+      {% for c in categories %}
+      <option value="{{ c }}" {{ 'selected' if c == category else '' }}>{{ c }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Stock
+    <select name="stock">
+      <option value="">All</option>
+      <option value="low" {{ 'selected' if stock_filter == 'low' else '' }}>Low or out</option>
+      <option value="out" {{ 'selected' if stock_filter == 'out' else '' }}>Out of stock</option>
+    </select>
+  </label>
+  <label class="check"><input type="checkbox" name="inactive" value="1"
+    {{ 'checked' if show_inactive else '' }}> Show inactive</label>
+  {% if missing %}<input type="hidden" name="missing" value="{{ missing }}">{% endif %}
+  <button class="btn btn-primary" type="submit">Apply</button>
+  <a class="btn btn-quiet" href="/products">Clear</a>
+</form>
+
+{% if missing == 'hsn' %}
+<div class="flash warn">
+  Showing only products with <strong>no HSN code</strong>. HSN is mandatory on a GST invoice and in
+  the HSN summary of your return, so these need filling in.
+  <a href="/products">Show all products</a>.
+</div>
+{% endif %}
+
+<div class="card flush">
+  <div class="tablewrap">
+  <table class="table stack">
+    <thead>
+      <tr>
+        <th>Product</th><th>Category</th><th>HSN / GST</th>
+        <th class="num">Cost</th><th class="num">Sale</th>
+        <th class="num">Stock</th><th class="actions">&nbsp;</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in products %}
+      {% set low = p.quantity <= p.low_stock_threshold %}
+      <tr class="{{ 'row-danger' if p.quantity <= 0 else ('row-warn' if low else '') }}">
+        <td>
+          <a href="/products/{{ p.id }}">{{ p.name }}</a>
+          <small>{{ p.sku }}{% if p.brand %} · {{ p.brand }}{% endif %}
+            {%- if p.is_serialized %} · serial tracked{% endif %}
+            {%- if not p.is_active %} · inactive{% endif %}</small>
+        </td>
+        <td>{{ p.category }}</td>
+        <td>{{ p.hsn_code or '—' }} <span class="pill">{{ p.gst_rate_bp|rate }}</span></td>
+        <td class="num">{{ p.cost_price_paise|money }}</td>
+        <td class="num">{{ p.sale_price_paise|money }}</td>
+        <td class="num">
+          {{ p.quantity }} {{ p.unit }}
+          {% if p.quantity <= 0 %}<span class="pill pill-danger">out</span>
+          {% elif low %}<span class="pill pill-warn">low</span>{% endif %}
+        </td>
+        <td class="actions">
+          <a class="btn btn-sm" href="/products/{{ p.id }}/edit">Edit</a>
+        </td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">No products match. <a href="/products/new">Add one</a>.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% if pages > 1 %}
+{% set base = '/products?q=' ~ term ~ '&category=' ~ category ~ '&stock=' ~ stock_filter ~ '&missing=' ~ missing ~ ('&inactive=1' if show_inactive else '') %}
+<div class="pager">
+  {% if page > 1 %}<a class="btn btn-sm" href="{{ base }}&page={{ page - 1 }}">← Previous</a>{% endif %}
+  <span>Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}<a class="btn btn-sm" href="{{ base }}&page={{ page + 1 }}">Next →</a>{% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

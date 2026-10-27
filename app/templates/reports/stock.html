@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Stock report · {{ trade }}{% endblock %}
+{% block content %}
+
+{% set qs = '?category=' ~ category ~ '&only=' ~ only %}
+
+<div class="pagehead">
+  <div>
+    <h1>Current stock</h1>
+    <p class="sub">
+      {# totals['items'], not totals.items: on a dict Jinja finds the items() method first. #}
+      {{ totals['items'] }} item{{ '' if totals['items'] == 1 else 's' }} ·
+      {{ totals.units }} unit{{ '' if totals.units == 1 else 's' }} on hand
+      {%- if category %} · {{ category }}{% endif %}
+      {%- if only == 'low' %} · only at or below the reorder level
+      {%- elif only == 'out' %} · only out of stock{% endif %}
+    </p>
+  </div>
+  <div class="pageactions">
+    <a class="btn" href="/reports/stock{{ qs }}&format=csv">Export CSV</a>
+    <button class="btn" type="button" data-print>Print</button>
+    <a class="btn btn-primary" href="/products/new">+ New product</a>
+  </div>
+</div>
+
+<form class="filters noprint" method="get" action="/reports/stock">
+  <label>Category
+    <select name="category">
+      <option value="">All categories</option>
+      {% for c in categories %}
+      <option value="{{ c }}" {{ 'selected' if category == c else '' }}>{{ c }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>Show
+    <select name="only">
+      <option value="" {{ 'selected' if not only else '' }}>Everything in the catalogue</option>
+      <option value="low" {{ 'selected' if only == 'low' else '' }}>Needs reordering</option>
+      <option value="out" {{ 'selected' if only == 'out' else '' }}>Out of stock</option>
+    </select>
+  </label>
+  <button class="btn btn-primary" type="submit">Apply</button>
+  <a class="btn btn-quiet" href="/reports/stock">Clear</a>
+</form>
+
+<div class="tiles tiles-4">
+  <div class="tile">
+    <span class="tile-label">Stock value at cost</span>
+    <span class="tile-value">{{ totals.cost_value|money(symbol=True) }}</span>
+    <span class="tile-foot">What the shelves cost you</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Value at sale price</span>
+    <span class="tile-value">{{ totals.sale_value|money(symbol=True) }}</span>
+    <span class="tile-foot">Before GST, if everything sold at list</span>
+  </div>
+  <div class="tile {{ 'tile-warn' if totals.low else '' }}">
+    <span class="tile-label">Needs reordering</span>
+    <span class="tile-value">{{ totals.low }}</span>
+    <span class="tile-foot">At or below the low-stock level</span>
+  </div>
+  <div class="tile {{ 'tile-warn' if totals.out else '' }}">
+    <span class="tile-label">Out of stock</span>
+    <span class="tile-value">{{ totals.out }}</span>
+    <span class="tile-foot">Nothing on hand</span>
+  </div>
+</div>
+
+<div class="card flush">
+  <div class="tablewrap">
+  <table class="table stack compact">
+    <thead>
+      <tr>
+        <th>Item</th><th>Category</th><th>HSN</th><th class="num">GST</th>
+        <th class="num">On hand</th><th class="num">Reorder at</th>
+        <th class="num">Cost</th><th class="num">Sale</th><th class="num">Value at cost</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in products %}
+      {% set out = p.quantity <= 0 %}
+      {% set low = p.quantity <= p.low_stock_threshold %}
+      <tr class="{{ 'row-danger' if out else ('row-warn' if low else '') }}">
+        <td>
+          <a href="/products/{{ p.id }}">{{ p.name }}</a>
+          {% if p.brand %} <span class="muted">{{ p.brand }}</span>{% endif %}
+          <small>{{ p.sku }}</small>
+        </td>
+        <td>{{ p.category }}</td>
+        <td class="mono">{{ p.hsn_code or '—' }}</td>
+        <td class="num">{{ p.gst_rate_bp|rate }}</td>
+        <td class="num">
+          <strong>{{ p.quantity }}</strong> {{ p.unit }}
+          {% if out %}<span class="pill pill-danger">out</span>
+          {% elif low %}<span class="pill pill-warn">low</span>{% endif %}
+        </td>
+        <td class="num">{{ p.low_stock_threshold }}</td>
+        <td class="num">{{ p.cost_price_paise|money }}</td>
+        <td class="num">{{ p.sale_price_paise|money }}</td>
+        <td class="num">{{ (p.quantity * p.cost_price_paise)|money }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="9" class="empty">
+        Nothing matches this filter.
+        {% if only %}<a href="/reports/stock">Show everything</a>.{% endif %}
+      </td></tr>
+      {% endfor %}
+    </tbody>
+    {% if products %}
+    <tfoot>
+      <tr>
+        <th colspan="4">{{ totals['items'] }} items</th>
+        <th class="num">{{ totals.units }}</th>
+        <th></th><th></th>
+        <th class="num">{{ totals.sale_value|money }}</th>
+        <th class="num">{{ totals.cost_value|money }}</th>
+      </tr>
+    </tfoot>
+    {% endif %}
+  </table>
+  </div>
+</div>
+
+<p class="fineprint">Quantities come from the stock ledger — every purchase, sale and service job
+  that used a part. Inactive products are left out. If a number looks wrong, open the product and
+  read its movement history rather than editing the quantity.</p>
+
+{% endblock %}

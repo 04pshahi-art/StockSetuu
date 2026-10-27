@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Purchases · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Purchases</h1>
+    <p class="sub">{{ total }} bill{{ '' if total == 1 else 's' }} matching · page {{ page }} of {{ pages }}</p>
+  </div>
+  <div class="pageactions">
+    <a class="btn btn-primary" href="/purchases/new">+ Record a purchase</a>
+    <a class="btn" href="/reports/gst/purchases">Purchase register (ITC)</a>
+  </div>
+</div>
+
+<form class="filters" method="get" action="/purchases">
+  <label class="grow">Search
+    <input type="search" name="q" value="{{ term }}" placeholder="Bill number, dealer, notes…">
+  </label>
+  <label>Dealer
+    <select name="dealer_id">
+      <option value="">All dealers</option>
+      {% for d in dealers %}
+      <option value="{{ d.id }}" {{ 'selected' if dealer_id == d.id|string else '' }}>{{ d.name }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label>From <input type="date" name="from" value="{{ date_from }}"></label>
+  <label>To <input type="date" name="to" value="{{ date_to }}"></label>
+  <button class="btn btn-primary" type="submit">Apply</button>
+  <a class="btn btn-quiet" href="/purchases">Clear</a>
+</form>
+
+<div class="tiles tiles-3">
+  <div class="tile">
+    <span class="tile-label">Taxable value</span>
+    <span class="tile-value">{{ summary.taxable|money(symbol=True) }}</span>
+    <span class="tile-foot">Cancelled bills excluded</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">GST paid to dealers</span>
+    <span class="tile-value">{{ summary.tax|money(symbol=True) }}</span>
+    <span class="tile-foot">Input tax credit, subject to their filing</span>
+  </div>
+  <div class="tile">
+    <span class="tile-label">Total paid</span>
+    <span class="tile-value">{{ summary.total|money(symbol=True) }}</span>
+  </div>
+</div>
+
+<div class="card flush">
+  <div class="tablewrap">
+  <table class="table stack">
+    <thead>
+      <tr>
+        <th>Bill</th><th>Dealer</th><th>Date</th><th class="num">Items</th>
+        <th class="num">Taxable</th><th class="num">GST</th><th class="num">Total</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for p in purchases %}
+      <tr class="{{ 'row-void' if p.is_void else '' }}">
+        <td>
+          <a href="/purchases/{{ p.id }}">{{ p.bill_number or '(no bill number)' }}</a>
+          {% if p.is_void %}<span class="pill pill-danger">cancelled</span>{% endif %}
+          {% if p.interstate %}<span class="pill pill-info">IGST</span>{% endif %}
+        </td>
+        <td>{{ p.dealer_name }}
+          <small>{{ p.dealer_gstin or 'no GSTIN — no ITC' }}</small>
+        </td>
+        <td>{{ p.bill_date|date }}</td>
+        <td class="num">{{ p.item_count }}</td>
+        <td class="num">{{ p.taxable_paise|money }}</td>
+        <td class="num">{{ (p.cgst_paise + p.sgst_paise + p.igst_paise)|money }}</td>
+        <td class="num"><strong>{{ p.total_paise|money }}</strong></td>
+      </tr>
+      {% else %}
+      <tr><td colspan="7" class="empty">
+        No purchases recorded for this filter.
+        <a href="/purchases/new">Record one</a>.
+      </td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+{% if pages > 1 %}
+{% set base = '/purchases?q=' ~ term ~ '&dealer_id=' ~ dealer_id ~ '&from=' ~ date_from ~ '&to=' ~ date_to %}
+<div class="pager">
+  {% if page > 1 %}<a class="btn btn-sm" href="{{ base }}&page={{ page - 1 }}">← Previous</a>{% endif %}
+  <span>Page {{ page }} of {{ pages }}</span>
+  {% if page < pages %}<a class="btn btn-sm" href="{{ base }}&page={{ page + 1 }}">Next →</a>{% endif %}
+</div>
+{% endif %}
+
+{% endblock %}

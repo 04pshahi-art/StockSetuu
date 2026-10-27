@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Reports &amp; GST · {{ trade }}{% endblock %}
+{% block content %}
+
+<div class="pagehead">
+  <div>
+    <h1>Reports &amp; GST</h1>
+    <p class="sub">Enough to run the shop and to make return filing straightforward.
+      Every register also downloads as CSV.</p>
+  </div>
+</div>
+
+<div class="grid2">
+  <section class="card">
+    <h2>Stock</h2>
+    <ul class="prose">
+      <li><a href="/reports/stock">Current stock list</a> — value at cost and at sale price,
+        with low and out-of-stock items pulled to the top.</li>
+      <li><a href="/reports/stock?only=low">Only what needs reordering</a></li>
+      <li><a href="/reports/stock?format=csv">Download the whole stock list as CSV</a></li>
+    </ul>
+  </section>
+
+  <section class="card">
+    <h2>Trading</h2>
+    <ul class="prose">
+      <li><a href="/reports/sales?from={{ date_from }}&to={{ date_to }}">Sales in a date range</a>
+        — revenue, payment modes and the best-selling items.</li>
+      <li><a href="/reports/purchases?from={{ date_from }}&to={{ date_to }}">Purchases in a date range</a>
+        — what the stock cost.</li>
+      <li><a href="/reports/dealers?from={{ date_from }}&to={{ date_to }}">Purchase history by dealer</a>
+        — and what each one charged for the same part.</li>
+    </ul>
+  </section>
+</div>
+
+<div class="grid2">
+  <section class="card">
+    <h2>GST</h2>
+    <ul class="prose">
+      <li><a href="/reports/gst/sales?from={{ date_from }}&to={{ date_to }}">Sales register (GSTR-1 help)</a>
+        — invoice-wise, rate-wise, HSN-wise and state-wise, with B2B and B2C separated.</li>
+      <li><a href="/reports/gst/purchases?from={{ date_from }}&to={{ date_to }}">Purchase register (input tax credit)</a>
+        — GST paid to dealers, flagging bills that cannot support a claim.</li>
+    </ul>
+    <p class="fineprint"><strong>This app does not file returns.</strong> It lays the figures out
+      so you or your accountant can key them into the GST portal without adding them up by hand.
+      Always tie the totals back to the portal before filing.</p>
+  </section>
+
+  <section class="card">
+    <h2>Tally export</h2>
+    <ul class="prose">
+      <li><a href="/reports/tally/masters?from={{ date_from }}&to={{ date_to }}">Masters (import first)</a>
+        — stock items, sales/purchase ledgers, tax ledgers and party ledgers for this range.</li>
+      <li><a href="/reports/tally/vouchers?from={{ date_from }}&to={{ date_to }}">Vouchers (import second)</a>
+        — sales and purchase entries for this range, ready for Gateway of Tally &gt; Import Data.</li>
+    </ul>
+    <p class="fineprint"><strong>Import the masters file first, then the vouchers file</strong> — a
+      voucher referencing a ledger that doesn't exist yet will fail to import. Test both files
+      against a spare/test Tally company before importing into your real books, and check the
+      Dr/Cr direction and stock quantity movement look right once imported.</p>
+  </section>
+
+  <section class="card">
+    <h2>Warranty &amp; history</h2>
+    <ul class="prose">
+      <li><a href="/warranty">Warranty lookup</a> — by serial number, customer name or phone.</li>
+      <li><a href="/serials?expiry=soon">Warranties expiring in the next 30 days</a></li>
+      <li><a href="/serials?expiry=expired">Already expired</a></li>
+      <li><a href="/reports/audit">Audit log</a> — sign-ins, price changes, cancellations.</li>
+    </ul>
+  </section>
+</div>
+
+<section class="card">
+  <h2>Date ranges</h2>
+  <p class="fineprint">Every dated report defaults to this month so far. The financial year runs
+    1 April to 31 March, which is what the invoice numbering follows.</p>
+  <div class="btn-row">
+    <a class="btn btn-sm" href="/reports/gst/sales">This month</a>
+    <a class="btn btn-sm" href="/reports/sales">Sales this month</a>
+    <a class="btn btn-sm" href="/reports/purchases">Purchases this month</a>
+  </div>
+</section>
+
+{% endblock %}

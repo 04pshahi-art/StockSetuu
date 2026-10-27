@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Audit log · {{ trade }}{% endblock %}
+
+{% block content %}
+{% set LABELS = {
+  'auth.login': 'Signed in',
+  'auth.logout': 'Signed out',
+  'auth.password_change': 'Password changed',
+  'auth.password_reset': 'Password reset from the admin CLI',
+  'user.create': 'Login created from the admin CLI',
+  'settings.update': 'Shop settings changed',
+  'settings.seed': 'Business details filled in from the CLI',
+  'product.create': 'Product added',
+  'product.update': 'Product edited',
+  'product.adjust_stock': 'Stock adjusted by hand',
+  'dealer.create': 'Dealer added',
+  'dealer.update': 'Dealer edited',
+  'purchase.create': 'Purchase recorded',
+  'purchase.void': 'Purchase cancelled',
+  'sale.create': 'Invoice issued',
+  'sale.void': 'Invoice cancelled',
+  'service.create': 'Service job logged',
+  'service.status': 'Service job status changed',
+  'serial.update': 'Serial / warranty corrected',
+  'serial.status': 'Serial status changed',
+  'import.products': 'Products imported from a file',
+} %}
+{% set LINKS = {
+  'sale': '/sales/',
+  'purchase': '/purchases/',
+  'product': '/products/',
+  'dealer': '/dealers/',
+  'service_job': '/services/',
+  'serial': '/serials/',
+} %}
+
+<div class="pagehead">
+  <div>
+    <h1>Audit log</h1>
+    <p class="sub">The last {{ entries|length }} thing{{ '' if entries|length == 1 else 's' }} that
+      happened, newest first.</p>
+  </div>
+  <div class="pageactions">
+    <button class="btn" type="button" data-print>Print</button>
+    <a class="btn" href="/reports">All reports</a>
+  </div>
+</div>
+
+<div class="card flush">
+  <div class="tablewrap">
+  <table class="table stack compact">
+    <thead>
+      <tr><th>When</th><th>What</th><th>Details</th><th>By</th></tr>
+    </thead>
+    <tbody>
+      {% for e in entries %}
+      {% set danger = e.action.endswith('.void') or e.action == 'product.adjust_stock' %}
+      <tr class="{{ 'row-warn' if danger else '' }}">
+        <td>{{ e.at|datetime }}</td>
+        <td>
+          {{ LABELS.get(e.action, e.action) }}
+          {% if danger %}<span class="pill pill-warn">check this</span>{% endif %}
+          <small class="mono">{{ e.action }}</small>
+        </td>
+        <td>
+          {% if e.entity_id and LINKS.get(e.entity) %}
+          <a href="{{ LINKS[e.entity] }}{{ e.entity_id }}">{{ e.detail or e.entity }}</a>
+          {% else %}
+          {{ e.detail or '—' }}
+          {% endif %}
+        </td>
+        <td>{{ e.user_name or e.username or 'system' }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="4" class="empty">Nothing logged yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</div>
+
+<section class="card">
+  <h2>What this is for</h2>
+  <ul class="prose">
+    <li>Only the most recent 300 entries are shown. The full history stays in the database and comes
+      along in every backup.</li>
+    <li>Cancelled invoices and bills, and stock adjusted by hand, are highlighted — those are the
+      three things worth a second look, because they change money or stock without a document
+      behind them.</li>
+    <li>Nothing in this app deletes a sale, purchase or job. They are cancelled, which leaves the
+      record and the reason in place. This log is where the reason lives.</li>
+    <li>Sign-ins are logged too. On a shop server that only you and your phone can reach, an
+      unexpected sign-in is worth knowing about.</li>
+  </ul>
+</section>
+
+{% endblock %}
